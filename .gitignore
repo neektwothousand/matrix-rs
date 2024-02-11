@@ -1,0 +1,6 @@
+*.yaml
+*sqlite_store
+murmur.log
+/deal-lilim/mcchecker/mclist.json
+/alma-armas/db
+/alma-armas/gelbooru_key

@@ -1,0 +1,17 @@
+[package]
+name = "deal-mcchecker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.66"
+async-minecraft-ping = {version = "0.8.0", path = "./async-minecraft-ping/"}
+matrix-sdk = { version = "0.6.2", features = ["anyhow", "e2e-encryption", "sled"]  }
+regex = "1.9.1"
+serde = { version = "1.0.177", features = ["derive"] }
+serde_json = "1.0.104"
+serde_yaml = "0.9.25"
+tokio = { version = "1.21.2", features = ["full"] }
+
