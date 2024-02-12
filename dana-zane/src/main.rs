@@ -1,17 +1,18 @@
 use matrix_sdk::{
 	config::SyncSettings,
-	ruma::{events::room::message::SyncRoomMessageEvent, UserId},
+	ruma::{
+		events::room::{member::StrippedRoomMemberEvent, message::SyncRoomMessageEvent},
+		UserId,
+	},
 	Client,
+	room::Room,
+	ruma::events::{room::message::*, *},
 };
-
-use matrix_sdk::room::Room;
-use matrix_sdk::ruma::events::{room::message::*, *};
-
-use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-use serde::{Serialize, Deserialize};
-
+use tokio::{
+	fs::File,
+	io::{AsyncReadExt, AsyncWriteExt},
+};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 #[tokio::main]
