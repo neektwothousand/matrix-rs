@@ -1,5 +1,6 @@
 *.yaml
 *sqlite_store
+*device_id
 murmur.log
 /deal-lilim/mcchecker/mclist.json
 /alma-armas/db
