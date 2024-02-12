@@ -62,10 +62,16 @@ async fn main() -> anyhow::Result<()> {
 			}
 		},
 	);
-
-	for room in client.invited_rooms() {
-		client.join_room_by_id(room.room_id()).await.unwrap();
-	}
+	client.add_event_handler(
+		|ev: StrippedRoomMemberEvent, room: Room, client: Client| async move {
+			if ev.state_key != client.user_id().unwrap() {
+				return;
+			}
+			if let Err(err) = room.join().await {
+				dbg!("{}", err);
+			};
+		},
+	);
 
 	loop {
 		let sync_settings = SyncSettings::default().timeout(Duration::from_secs(60));
