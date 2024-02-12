@@ -104,7 +104,10 @@ fn cmd(command: &str, args: Vec<&str>, stdin_str: Option<String>) -> String {
 }
 
 async fn get_original_text(reply_event: &TimelineEvent, room: &Room) -> Option<String> {
-	let unsigned_event = reply_event.event.deserialize_as::<UnsignedRoomRedactionEvent>().ok()?;
+	let unsigned_event = reply_event
+		.event
+		.deserialize_as::<UnsignedRoomRedactionEvent>()
+		.ok()?;
 	let replace = unsigned_event.unsigned.relations.replace;
 	if let Some(replace) = replace {
 		let timeline_event = room.event(&replace.event_id).await.ok()?;

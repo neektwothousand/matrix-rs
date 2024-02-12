@@ -207,7 +207,9 @@ async fn main() {
 		.unwrap();
 
 	// First we need to log in.
-	let login_builder = client.matrix_auth().login_username(&user_id, &user.password);
+	let login_builder = client
+		.matrix_auth()
+		.login_username(&user_id, &user.password);
 
 	let alma_device_id_file_str = "alma_device_id";
 	if let Ok(mut f) = File::open(alma_device_id_file_str).await {

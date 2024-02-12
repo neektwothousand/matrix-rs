@@ -5,9 +5,10 @@ use matrix_sdk::{
 };
 use serde::Deserialize;
 use std::{
-	fs::{File, self},
+	fs::{self, File},
 	io::{Read, Write},
-	path::Path, os::unix::net::{UnixStream, UnixListener},
+	os::unix::net::{UnixListener, UnixStream},
+	path::Path,
 };
 
 #[derive(Deserialize)]
@@ -65,7 +66,9 @@ async fn main() -> anyhow::Result<()> {
 			.unwrap(),
 	));
 
-	let login_builder = client.matrix_auth().login_username(&user_id, &user.password);
+	let login_builder = client
+		.matrix_auth()
+		.login_username(&user_id, &user.password);
 
 	let deal_device_id_file_str = "deal_device_id";
 	if let Ok(mut f) = File::open(deal_device_id_file_str) {

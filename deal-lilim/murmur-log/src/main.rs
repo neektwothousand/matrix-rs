@@ -7,7 +7,7 @@ use matrix_sdk::{
 	ruma::{events::room::message::RoomMessageEventContent, RoomId, UserId},
 	Client,
 };
-use notify::{Event, RecommendedWatcher, Config, Watcher, RecursiveMode};
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use regex::Regex;
 use serde::Deserialize;
 use std::{
@@ -59,11 +59,7 @@ async fn async_watch<P: AsRef<Path>>(path: P, user: &User, client: &Client) -> n
 	Ok(())
 }
 
-async fn event_handler(
-	ev: Event,
-	client: &Client,
-	user: &User,
-) {
+async fn event_handler(ev: Event, client: &Client, user: &User) {
 	match ev.kind {
 		notify::EventKind::Modify(_) => {
 			let mut buf = String::new();
@@ -90,7 +86,7 @@ async fn event_handler(
 			last = r.replace(&last, "").to_string();
 			let r = Regex::new(r":").unwrap();
 			last = r.replace(&last, "").to_string();
-			let r = Regex::new(r"\([0-9]\)>").unwrap();	
+			let r = Regex::new(r"\([0-9]\)>").unwrap();
 			last = r.replace(&last, "").to_string();
 			let r = Regex::new(r":.*").unwrap();
 			last = r.replace(&last, "").to_string();
@@ -120,7 +116,9 @@ async fn main() -> anyhow::Result<()> {
 			.unwrap(),
 	));
 
-	let login_builder = client.matrix_auth().login_username(&user_id, &user.password);
+	let login_builder = client
+		.matrix_auth()
+		.login_username(&user_id, &user.password);
 
 	let deal_device_id_file_str = "deal_device_id";
 	if let Ok(mut f) = File::open(deal_device_id_file_str) {

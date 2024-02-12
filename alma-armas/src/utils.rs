@@ -4,8 +4,8 @@ use std::io::BufReader;
 
 use matrix_sdk::ruma::events::relation::Annotation;
 use matrix_sdk::ruma::events::room::message::{
-	ImageMessageEventContent, MessageType, RoomMessageEvent, RoomMessageEventContent,
-	VideoMessageEventContent, ForwardThread, AddMentions,
+	AddMentions, ForwardThread, ImageMessageEventContent, MessageType, RoomMessageEvent,
+	RoomMessageEventContent, VideoMessageEventContent,
 };
 use matrix_sdk::Room;
 use mime::Mime;
@@ -66,8 +66,12 @@ pub async fn get_booru_posts(url: &str) -> Result<Option<Vec<BooruPost>>, Box<dy
 	}
 	match from_str::<DanbooruPost>(&response_string) {
 		Ok(danbooru_post) => {
-			let Some(original) = danbooru_post.media_asset.variants
-				.iter().find(|v| v.r#type == "original") else {
+			let Some(original) = danbooru_post
+				.media_asset
+				.variants
+				.iter()
+				.find(|v| v.r#type == "original")
+			else {
 				return Ok(None);
 			};
 			let file_url = original.url.clone();
@@ -166,8 +170,11 @@ pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) {
 		.unwrap();
 	let forward_thread = ForwardThread::No;
 	let add_mentions = AddMentions::No;
-	let text_content = RoomMessageEventContent::text_plain(caption)
-		.make_reply_to(&original_message.as_original().unwrap(),forward_thread,add_mentions);
+	let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
+		&original_message.as_original().unwrap(),
+		forward_thread,
+		add_mentions,
+	);
 	let event_id = room.send(text_content).await.unwrap().event_id;
 
 	use matrix_sdk::ruma::events::reaction;

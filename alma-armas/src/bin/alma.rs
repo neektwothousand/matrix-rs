@@ -36,7 +36,7 @@ fn get_url_query(is_url: bool, query: &str, user_id: &UserId) -> Option<(Url, bo
 			let post_id = match url.path_segments() {
 				Some(segments) => {
 					let Some(last_seg) = segments.last() else {
-						return None
+						return None;
 					};
 					last_seg.parse::<u64>().ok()?
 				}
@@ -45,7 +45,7 @@ fn get_url_query(is_url: bool, query: &str, user_id: &UserId) -> Option<(Url, bo
 			url_query = format!("https://{}/posts/{post_id}.json", url_domain);
 		} else {
 			let Some(post_id_query) = url.query_pairs().find(|q| q.0 == Cow::Borrowed("id")) else {
-				return None
+				return None;
 			};
 			url_query = format!(
 				"https://{}/index.php?page=dapi&s=post&q=index&json=1&{}={}",
@@ -86,7 +86,8 @@ async fn handle_message_event(
 	};
 	let mut args = text.body.split_whitespace();
 	let command = args.next().unwrap();
-	if let Some(send_text_plain) = match_command(original_event.clone(), command, &room, args).await {
+	if let Some(send_text_plain) = match_command(original_event.clone(), command, &room, args).await
+	{
 		room.send(RoomMessageEventContent::text_plain(send_text_plain))
 			.await?;
 	}
@@ -309,8 +310,11 @@ async fn match_reaction(
 		.deserialize_as::<RoomMessageEvent>()?;
 	let forward_thread = ForwardThread::No;
 	let add_mentions = AddMentions::No;
-	let text_content = RoomMessageEventContent::text_plain(caption)
-		.make_reply_to(&original_message.as_original().unwrap(),forward_thread,add_mentions);
+	let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
+		&original_message.as_original().unwrap(),
+		forward_thread,
+		add_mentions,
+	);
 	let sent_text_event_id = to_room_id.send(text_content).await?.event_id;
 	room.redact(&media_event_id, None, None).await?;
 	room.redact(&caption_event_id, None, None).await?;
@@ -353,8 +357,10 @@ async fn main() {
 		.unwrap();
 
 	// First we need to log in.
-	let login_builder = client.matrix_auth().login_username(&user_id, &user.password);
-	
+	let login_builder = client
+		.matrix_auth()
+		.login_username(&user_id, &user.password);
+
 	let alma_device_id_file_str = "alma_device_id";
 	if let Ok(mut f) = File::open(alma_device_id_file_str).await {
 		let mut device_id_str = String::new();
