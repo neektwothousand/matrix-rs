@@ -7,10 +7,9 @@ use std::{
 
 use matrix_sdk::{
 	config::SyncSettings,
-	ruma::{events::room::message::RoomMessageEventContent, RoomId, UserId},
 	ruma::api::client::message::send_message_event,
-	Client,
-	Room,
+	ruma::{events::room::message::RoomMessageEventContent, RoomId, UserId},
+	Client, Room,
 };
 use serde::Deserialize;
 use tokio::spawn;
@@ -85,7 +84,7 @@ async fn read_mur_sock(user: &User, client: &Client) {
 		match joined_room.send(content).await {
 			Ok(res) => {
 				spawn(delete_message(joined_room.clone(), res));
-			},
+			}
 			Err(err) => eprintln!("{:?}", err),
 		}
 	}
