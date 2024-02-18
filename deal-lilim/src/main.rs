@@ -124,14 +124,12 @@ async fn main() {
 		let mut f = File::create(deal_device_id_file_str).unwrap();
 		f.write_all(response.device_id.as_bytes()).unwrap();
 	}
-	client.sync_once(SyncSettings::default()).await.unwrap();
 
-	let client_sync = tokio::join!(
-		read_dis_sock(user, client),
-		read_mur_sock(user, client),
-		client.sync(SyncSettings::default())
-	).2;
+	spawn(read_dis_sock(user, client));
+	spawn(read_mur_sock(user, client));
+
 	loop {
+		let client_sync = client.sync(SyncSettings::default()).await;
 		let Err(ref e) = client_sync else {
 			continue;
 		};
