@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
 	"alma-armas",
-	"deal-lilim/murmur-log",
-	"deal-lilim/discord-log",
 	"dana-zane",
+	"deal-lilim",
 ]
