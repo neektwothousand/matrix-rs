@@ -80,13 +80,11 @@ async fn event_handler(ev: Event, client: &Client, user: &User) {
 			last = split.1.trim().to_string();
 			let r = Regex::new(r"<[0-9]*").unwrap();
 			last = r.replace(&last, "").to_string();
-			let r = Regex::new(r"\([0-9]\):").unwrap();
-			last = r.replace(&last, "").to_string();
-			let r = Regex::new(r"\(-[0-9]\):").unwrap();
+			let r = Regex::new(r"\(-[0-9]\):|\([0-9]\):").unwrap();
 			last = r.replace(&last, "").to_string();
 			let r = Regex::new(r":").unwrap();
 			last = r.replace(&last, "").to_string();
-			let r = Regex::new(r"\([0-9]\)>").unwrap();
+			let r = Regex::new(r"\([0-9]\)>|\(-[0-9]\)>").unwrap();
 			last = r.replace(&last, "").to_string();
 			let r = Regex::new(r":.*").unwrap();
 			last = r.replace(&last, "").to_string();
