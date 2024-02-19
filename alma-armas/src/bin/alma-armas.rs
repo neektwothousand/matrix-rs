@@ -321,7 +321,7 @@ async fn match_reaction(
 
 	if let Some(queues) = &user_room.queue {
 		for queue_chat_id in queues {
-			let path = format!("db/queue/{}", to_room_id.room_id().as_str());
+			let path = format!("alma-armas/db/queue/{}", to_room_id.room_id().as_str());
 			std::fs::create_dir_all(path.clone()).unwrap();
 			let mut queue_file = std::fs::File::options()
 				.create(true)
