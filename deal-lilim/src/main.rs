@@ -38,10 +38,7 @@ fn read_stream(mut stream: UnixStream) -> String {
 	String::from_utf8_lossy(buf.as_slice()).to_string()
 }
 
-async fn read_dis_sock(user: &User, client: &Client) {
-	let room_id = RoomId::parse(&user.room_id).unwrap();
-	let joined_room = client.get_room(&room_id).unwrap();
-
+async fn read_dis_sock(room: &Room) {
 	if Path::new(DIS_SOCK).exists() {
 		fs::remove_file(DIS_SOCK).unwrap();
 	}
@@ -55,19 +52,16 @@ async fn read_dis_sock(user: &User, client: &Client) {
 			}
 		};
 		let content = RoomMessageEventContent::text_plain(sock_message);
-		match joined_room.send(content).await {
+		match room.send(content).await {
 			Ok(res) => {
-				spawn(delete_message(joined_room.clone(), res));
+				spawn(delete_message(room.clone(), res));
 			}
 			Err(err) => eprintln!("{:?}", err),
 		}
 	}
 }
 
-async fn read_mur_sock(user: &User, client: &Client) {
-	let room_id = RoomId::parse(&user.room_id).unwrap();
-	let joined_room = client.get_room(&room_id).unwrap();
-
+async fn read_mur_sock(room: &Room) {
 	if Path::new(MUR_SOCK).exists() {
 		fs::remove_file(MUR_SOCK).unwrap();
 	}
@@ -81,9 +75,9 @@ async fn read_mur_sock(user: &User, client: &Client) {
 			}
 		};
 		let content = RoomMessageEventContent::text_plain(sock_message);
-		match joined_room.send(content).await {
+		match room.send(content).await {
 			Ok(res) => {
-				spawn(delete_message(joined_room.clone(), res));
+				spawn(delete_message(room.clone(), res));
 			}
 			Err(err) => eprintln!("{:?}", err),
 		}
@@ -92,9 +86,7 @@ async fn read_mur_sock(user: &User, client: &Client) {
 
 #[tokio::main]
 async fn main() {
-	let user: &'static mut User = Box::leak(Box::new(
-		serde_yaml::from_reader(File::open("deal.yaml").unwrap()).unwrap(),
-	));
+	let user: User = serde_yaml::from_reader(File::open("deal.yaml").unwrap()).unwrap();
 	let user_id = UserId::parse(user.name.as_str()).unwrap();
 	let client = Box::leak(Box::new(
 		Client::builder()
@@ -123,9 +115,11 @@ async fn main() {
 		let mut f = File::create(deal_device_id_file_str).unwrap();
 		f.write_all(response.device_id.as_bytes()).unwrap();
 	}
-
-	spawn(read_dis_sock(user, client));
-	spawn(read_mur_sock(user, client));
+	
+	let room_id = RoomId::parse(&user.room_id).unwrap();
+	let room: &'static Room = Box::leak(Box::new(client.get_room(&room_id).unwrap()));
+	spawn(read_dis_sock(&room));
+	spawn(read_mur_sock(&room));
 
 	loop {
 		let client_sync = client.sync(SyncSettings::default()).await;
