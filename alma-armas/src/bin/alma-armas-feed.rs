@@ -15,7 +15,7 @@ use tokio::{
 };
 
 async fn has_md5(feed: &str, md5: &str) -> bool {
-	let path = format!("db/{feed}");
+	let path = format!("alma-armas/db/{feed}");
 	std::fs::create_dir_all(path.clone()).unwrap();
 	let md5_file = std::fs::File::options()
 		.create(true)
@@ -33,7 +33,7 @@ async fn has_md5(feed: &str, md5: &str) -> bool {
 }
 
 async fn write_md5(feed: &str, md5: &str) {
-	let path = format!("db/{feed}");
+	let path = format!("alma-armas/db/{feed}");
 	let mut md5_file = std::fs::File::options()
 		.append(true)
 		.open(&format!("{path}/md5"))
@@ -67,7 +67,7 @@ async fn read_lastid(feed: &str, tag: &str, rating: &str, website: &str) -> u64 
 }
 
 async fn write_lastid(feed: &str, tag: &str, rating: &str, website: &str, lastid: u64) {
-	let path = format!("db/{feed}/{tag}/{rating}/{website}/");
+	let path = format!("alma-armas/db/{feed}/{tag}/{rating}/{website}/");
 	let mut lastid_file = std::fs::File::create(&format!("{path}/lastid")).unwrap();
 	writeln!(&mut lastid_file, "{}", lastid).unwrap();
 }
