@@ -6,11 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.66"
-matrix-sdk = "0.7.0"
+anyhow = "1.0.80"
+matrix-sdk = "0.7.1"
 mime = "0.3.17"
 serde = "1.0.196"
-serde_yaml = "0.9.31"
-tokio = { version = "1.21.2", features = ["full"] }
+serde_yaml = "0.9.32"
+tokio = { version = "1.36.0", features = ["full"] }
 zip = "0.6.6"
 
