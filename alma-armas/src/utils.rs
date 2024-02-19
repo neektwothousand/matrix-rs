@@ -16,7 +16,7 @@ pub mod db;
 use db::{Booru, BooruPost, BooruRoom, DanbooruPost, GelbooruSource, User};
 
 pub fn read_users() -> Result<Vec<User>, Box<dyn Error>> {
-	let path = "db/users";
+	let path = "alma-armas/db/users";
 
 	// Open the file in read-only mode with buffer.
 	let file = File::open(path)?;
@@ -28,7 +28,7 @@ pub fn read_users() -> Result<Vec<User>, Box<dyn Error>> {
 }
 
 pub fn read_booru() -> Result<Vec<Booru>, Box<dyn Error>> {
-	let path = "db/booru";
+	let path = "alma-armas/db/booru";
 
 	// Open the file in read-only mode with buffer.
 	let file = File::open(path)?;
