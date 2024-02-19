@@ -115,7 +115,7 @@ async fn main() {
 		let mut f = File::create(deal_device_id_file_str).unwrap();
 		f.write_all(response.device_id.as_bytes()).unwrap();
 	}
-	
+
 	let room_id = RoomId::parse(&user.room_id).unwrap();
 	let room: &'static Room = Box::leak(Box::new(client.get_room(&room_id).unwrap()));
 	spawn(read_dis_sock(&room));
