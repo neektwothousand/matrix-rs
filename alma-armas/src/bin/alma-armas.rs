@@ -259,7 +259,6 @@ async fn match_reaction(
 		}
 	}
 	let mut source = String::new();
-	dbg!("{:?}", caption_event_text);
 	if let Ok(url) = url::Url::parse(caption_event_text.split("—").last().unwrap().trim()) {
 		source = url.to_string();
 	}
