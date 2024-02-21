@@ -42,7 +42,7 @@ async fn write_md5(feed: &str, md5: &str) {
 }
 
 async fn read_lastid(feed: &str, tag: &str, rating: &str, website: &str) -> u64 {
-	let path = format!("db/{feed}/{tag}/{rating}/{website}/");
+	let path = format!("alma-armas/db/{feed}/{tag}/{rating}/{website}/");
 	std::fs::create_dir_all(path.clone()).unwrap();
 	let lastid_file = std::fs::File::options()
 		.create(true)
