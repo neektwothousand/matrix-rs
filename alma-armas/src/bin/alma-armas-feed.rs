@@ -8,7 +8,11 @@ use matrix_sdk::{
 	Client,
 };
 use serde::Deserialize;
-use std::io::{BufRead, Write};
+use std::{
+	io::{BufRead, Write},
+	thread::sleep,
+	time::Duration,
+};
 use tokio::{
 	fs::File,
 	io::{AsyncReadExt, AsyncWriteExt},
@@ -230,6 +234,6 @@ async fn main() {
 
 	loop {
 		send_posts(&client).await;
-		std::thread::sleep(std::time::Duration::from_secs(3600));
+		sleep(Duration::new(30, 0));
 	}
 }
