@@ -402,5 +402,11 @@ async fn main() {
 
 	client.add_event_handler(handle_message_event);
 	client.add_event_handler(handle_reaction_event);
-	client.sync(SyncSettings::default()).await.unwrap();
+	loop {
+		let sync = client.sync(SyncSettings::default()).await;
+		if let Err(err) = sync {
+			eprintln!("{:?}", err);
+			continue;
+		};
+	}
 }
