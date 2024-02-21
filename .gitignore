@@ -2,6 +2,7 @@
 *sqlite_store
 *device_id
 murmur.log
+/target/
 /alma-armas/db
 /alma-armas/gelbooru_key
 /.cargo/
