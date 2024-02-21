@@ -11,6 +11,8 @@ use matrix_sdk::ruma::events::room::message::{
 	MessageType, RoomMessageEventContent, SyncRoomMessageEvent,
 };
 use matrix_sdk::ruma::events::{OriginalSyncMessageLikeEvent, SyncMessageLikeEvent};
+use matrix_sdk::ruma::EventId;
+use matrix_sdk::ruma::OwnedEventId;
 use matrix_sdk::ruma::RoomId;
 use matrix_sdk::ruma::UserId;
 use matrix_sdk::Client;
@@ -211,23 +213,35 @@ async fn match_reaction(
 		.event
 		.deserialize_as::<RoomMessageEvent>()?;
 	let caption_event = match caption_event.as_original() {
-		Some(caption_event) => caption_event.to_owned(),
+		Some(caption_event) => caption_event,
 		None => {
 			let err = format!("cannot get {:?} as original", &caption_event);
 			return Err(Error::msg(err));
 		}
 	};
-	let (media_event_id, media_event) =
-		if let Relation::Reply { in_reply_to } = caption_event.content.relates_to.unwrap() {
-			let event_id = in_reply_to.event_id;
-			(event_id.clone(), room.event(&event_id).await?.event)
-		} else {
-			return Err(Error::msg("no reply found"));
+	let (reply_event, media_event_id) = if let Some(Relation::Reply { in_reply_to }) =
+		caption_event.content.relates_to.as_ref()
+	{
+		let in_reply_event = in_reply_to.clone();
+		let timeline_event = loop {
+			let Ok(event) = room.event(&in_reply_to.event_id).await else {
+				continue;
+			};
+			break event;
 		};
+		let Ok(Some(media_event_id)) = timeline_event.event.get_field::<OwnedEventId>("event_id")
+		else {
+			return Ok(());
+		};
+		let media_event_id = EventId::parse(media_event_id).unwrap();
+		(in_reply_event.clone(), media_event_id)
+	} else {
+		return Err(Error::msg("no reply found"));
+	};
 
 	if reaction == "❌" {
+		room.redact(&reply_event.event_id, None, None).await?;
 		room.redact(&media_event_id, None, None).await?;
-		room.redact(&caption_event_id, None, None).await?;
 		return Ok(());
 	}
 
@@ -238,14 +252,15 @@ async fn match_reaction(
 	};
 
 	let mut tags: Vec<String> = vec![];
-	let caption_event_text = caption_event.content.msgtype.body();
+	let caption_event_text = caption_event.content.body();
 	if let Some(hashtags) = parse_caption_hashtags(caption_event_text) {
 		for hashtag in hashtags {
 			tags.push(hashtag);
 		}
 	}
 	let mut source = String::new();
-	if let Ok(url) = url::Url::parse(caption_event_text.split_whitespace().last().unwrap()) {
+	dbg!("{:?}", caption_event_text);
+	if let Ok(url) = url::Url::parse(caption_event_text.split("—").last().unwrap().trim()) {
 		source = url.to_string();
 	}
 
@@ -286,7 +301,15 @@ async fn match_reaction(
 		.get_room(&RoomId::parse(user_room.id)?)
 		.ok_or_else(|| eprintln!("room not found"))
 		.unwrap();
+
+	let media_event = loop {
+		let Ok(event) = room.event(&media_event_id).await else {
+			continue;
+		};
+		break event;
+	};
 	let media_event = media_event
+		.event
 		.deserialize_as::<RoomMessageEvent>()?
 		.as_original()
 		.unwrap()
