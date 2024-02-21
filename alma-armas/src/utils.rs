@@ -161,13 +161,13 @@ pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) {
 		_ => return,
 	};
 
-	let original_message = room
-		.event(&event_id)
-		.await
-		.unwrap()
-		.event
-		.deserialize_as::<RoomMessageEvent>()
-		.unwrap();
+	let timeline_event = loop {
+		match room.event(&event_id).await {
+			Ok(event) => break event,
+			Err(_) => continue,
+		}
+	};
+	let original_message = timeline_event.event.deserialize_as::<RoomMessageEvent>().unwrap();
 	let forward_thread = ForwardThread::No;
 	let add_mentions = AddMentions::No;
 	let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
