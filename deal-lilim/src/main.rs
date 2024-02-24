@@ -12,7 +12,7 @@ use matrix_sdk::{
 	Client, Room,
 };
 use serde::Deserialize;
-use tokio::spawn;
+use tokio::task::spawn;
 use tokio::time::{sleep, Duration};
 
 const DIS_SOCK: &str = "/tmp/dis-rs.sock";
@@ -25,7 +25,7 @@ struct User {
 	room_id: String,
 }
 
-async fn delete_message(room: Room, res: send_message_event::v3::Response) {
+async fn delete_message(room: &Room, res: send_message_event::v3::Response) {
 	let event_id = res.event_id;
 	sleep(Duration::new(3600, 0)).await;
 	let res = room.redact(&event_id, None, None).await;
@@ -41,11 +41,11 @@ fn read_stream(mut stream: UnixStream) -> String {
 	String::from_utf8_lossy(buf.as_slice()).to_string()
 }
 
-async fn read_dis_sock(room: &Room) {
-	if Path::new(DIS_SOCK).exists() {
-		fs::remove_file(DIS_SOCK).unwrap();
+async fn read_sock(room: &'static Room, socket: &str) {
+	if Path::new(socket).exists() {
+		fs::remove_file(socket).unwrap();
 	}
-	let unix_listener = UnixListener::bind(DIS_SOCK).unwrap();
+	let unix_listener = UnixListener::bind(socket).unwrap();
 	for stream in unix_listener.incoming() {
 		let sock_message = match stream {
 			Ok(stream) => read_stream(stream),
@@ -54,36 +54,17 @@ async fn read_dis_sock(room: &Room) {
 				continue;
 			}
 		};
-		let content = RoomMessageEventContent::text_plain(sock_message);
-		match room.send(content).await {
-			Ok(res) => {
-				spawn(delete_message(room.clone(), res));
+		spawn(async move {
+			println!("{}", &sock_message);
+			let content = RoomMessageEventContent::text_plain(sock_message);
+			match room.send(content).await {
+				Ok(res) => {
+					delete_message(&room, res).await;
+				}
+				Err(err) => eprintln!("{:?}", err),
 			}
-			Err(err) => eprintln!("{:?}", err),
-		}
-	}
-}
-
-async fn read_mur_sock(room: &Room) {
-	if Path::new(MUR_SOCK).exists() {
-		fs::remove_file(MUR_SOCK).unwrap();
-	}
-	let unix_listener = UnixListener::bind(MUR_SOCK).unwrap();
-	for stream in unix_listener.incoming() {
-		let sock_message = match stream {
-			Ok(stream) => read_stream(stream),
-			Err(err) => {
-				eprintln!("{:?}", err);
-				continue;
-			}
-		};
-		let content = RoomMessageEventContent::text_plain(sock_message);
-		match room.send(content).await {
-			Ok(res) => {
-				spawn(delete_message(room.clone(), res));
-			}
-			Err(err) => eprintln!("{:?}", err),
-		}
+		});
+		tokio::task::yield_now().await;
 	}
 }
 
@@ -121,8 +102,8 @@ async fn main() {
 
 	let room_id = RoomId::parse(&user.room_id).unwrap();
 	let room: &'static Room = Box::leak(Box::new(client.get_room(&room_id).unwrap()));
-	spawn(read_dis_sock(&room));
-	spawn(read_mur_sock(&room));
+	spawn(read_sock(&room, DIS_SOCK));
+	spawn(read_sock(&room, MUR_SOCK));
 
 	loop {
 		let client_sync = client.sync(SyncSettings::default()).await;
