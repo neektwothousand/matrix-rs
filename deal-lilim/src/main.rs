@@ -72,14 +72,12 @@ async fn read_sock(room: &'static Room, socket: &str) {
 async fn main() {
 	let user: User = serde_yaml::from_reader(File::open("deal.yaml").unwrap()).unwrap();
 	let user_id = UserId::parse(user.name.as_str()).unwrap();
-	let client = Box::leak(Box::new(
-		Client::builder()
-			.sqlite_store("deal_sqlite_store", None)
-			.server_name(user_id.server_name())
-			.build()
-			.await
-			.unwrap(),
-	));
+	let client = Client::builder()
+		.sqlite_store("deal_sqlite_store", None)
+		.server_name(user_id.server_name())
+		.build()
+		.await
+		.unwrap();
 
 	let login_builder = client
 		.matrix_auth()
