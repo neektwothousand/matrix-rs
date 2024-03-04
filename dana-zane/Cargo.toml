@@ -9,7 +9,7 @@ edition = "2021"
 anyhow = "1.0.80"
 matrix-sdk = "0.7.1"
 mime = "0.3.17"
-serde = "1.0.196"
+serde = "1.0.197"
 serde_yaml = "0.9.32"
 tokio = { version = "1.36.0", features = ["full"] }
 zip = "0.6.6"
