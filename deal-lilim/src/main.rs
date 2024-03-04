@@ -97,15 +97,14 @@ async fn main() {
 
 	let room_id = RoomId::parse(&user.room_id).unwrap();
 	let room: &'static Room = Box::leak(Box::new(client.get_room(&room_id).unwrap()));
+	let sockets = [DIS_SOCK, MUR_SOCK];
 	
-	for socket in [DIS_SOCK, MUR_SOCK] {
+	for socket in sockets {
 		if Path::new(socket).exists() {
 			fs::remove_file(socket).unwrap();
 		}
+		spawn(read_sock(&room, socket));
 	}
-
-	spawn(read_sock(&room, DIS_SOCK));
-	spawn(read_sock(&room, MUR_SOCK));
 
 	loop {
 		let client_sync = client.sync(SyncSettings::default()).await;
