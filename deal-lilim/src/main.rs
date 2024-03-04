@@ -42,9 +42,6 @@ fn read_stream(mut stream: UnixStream) -> String {
 }
 
 async fn read_sock(room: &'static Room, socket: &str) {
-	if Path::new(socket).exists() {
-		fs::remove_file(socket).unwrap();
-	}
 	let unix_listener = UnixListener::bind(socket).unwrap();
 	for stream in unix_listener.incoming() {
 		let sock_message = match stream {
@@ -100,6 +97,13 @@ async fn main() {
 
 	let room_id = RoomId::parse(&user.room_id).unwrap();
 	let room: &'static Room = Box::leak(Box::new(client.get_room(&room_id).unwrap()));
+	
+	for socket in [DIS_SOCK, MUR_SOCK] {
+		if Path::new(socket).exists() {
+			fs::remove_file(socket).unwrap();
+		}
+	}
+
 	spawn(read_sock(&room, DIS_SOCK));
 	spawn(read_sock(&room, MUR_SOCK));
 
