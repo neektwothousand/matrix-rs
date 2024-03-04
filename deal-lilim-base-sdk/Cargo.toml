@@ -1,5 +1,5 @@
 [package]
-name = "deal-lilim"
+name = "deal-lilim-base-sdk"
 version = "0.1.0"
 edition = "2021"
 
