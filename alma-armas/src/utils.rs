@@ -137,7 +137,9 @@ pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) {
 
 			let image_message = ImageMessageEventContent::plain(body.to_string(), mxc_url);
 			let room_message = RoomMessageEventContent::new(MessageType::Image(image_message));
-			room.send(room_message).await.unwrap().event_id
+			if let Ok(message) = room.send(room_message).await {
+				message.event_id
+			} else { return }
 		}
 		"video/mp4" => {
 			let body = file_url.path_segments().unwrap().last().unwrap();
