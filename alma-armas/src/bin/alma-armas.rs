@@ -429,8 +429,8 @@ async fn main() {
 	client.add_event_handler(handle_reaction_event);
 	loop {
 		let sync = client.sync(SyncSettings::default()).await;
-		if let Err(err) = sync {
-			eprintln!("{:?}", err);
+		if let Err(_) = sync {
+			eprintln!("alma-armas http error, retrying");
 			continue;
 		};
 	}
