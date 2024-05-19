@@ -314,7 +314,30 @@ async fn match_reaction(
 		.unwrap()
 		.to_owned();
 
+	use teloxide::types::{ChatId, InputFile};
+	use teloxide::prelude::Requester;
+	use teloxide::payloads::SendPhotoSetters;
+	let token: String = std::fs::read_to_string("alma-armas/tgtoken").unwrap();
+	let tgbot = teloxide::Bot::new(token);
+	let tgnova = ChatId(-1001434279006);
+
+	use matrix_sdk::ruma::events::room::MediaSource;
 	let request = if let MessageType::Image(image) = media_event.content.msgtype {
+		if let MediaSource::Plain(ref mxcuri) = image.source {
+			match url::Url::parse(mxcuri.as_str()) {
+				Ok(u) => {
+					let domain = "https://matrix.org/_matrix/media/v3/download/matrix.org";
+					let path = u.path();
+					let u = url::Url::parse(format!("{}{}", domain, path).as_str()).unwrap();
+					let tgres = tgbot.send_photo(tgnova, InputFile::url(u.clone()))
+						.caption(&caption).await;
+					if tgres.is_err() {
+						eprintln!("{:?}\n{:?}", tgres, u);
+					}
+				}
+				Err(e) => eprintln!("{:?}", e),
+			}
+		}
 		RoomMessageEventContent::new(MessageType::Image(image))
 	} else if let MessageType::Video(video) = media_event.content.msgtype {
 		RoomMessageEventContent::new(MessageType::Video(video))
@@ -338,6 +361,8 @@ async fn match_reaction(
 		add_mentions,
 	);
 	let sent_text_event_id = to_room_id.send(text_content).await?.event_id;
+
+
 	room.redact(&media_event_id, None, None).await?;
 	room.redact(&caption_event_id, None, None).await?;
 
