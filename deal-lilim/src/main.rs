@@ -27,7 +27,7 @@ struct User {
 
 async fn delete_message(room: &Room, res: send_message_event::v3::Response) {
 	let event_id = res.event_id;
-	sleep(Duration::new(3600, 0)).await;
+	sleep(Duration::from_secs(86400)).await;
 	let res = room.redact(&event_id, None, None).await;
 	if let Err(res) = res {
 		eprintln!("redact:\n{:#?}", res);
