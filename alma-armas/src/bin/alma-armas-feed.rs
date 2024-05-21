@@ -98,7 +98,10 @@ async fn send_posts_in_chat(
 		booru.website, "index.php?page=dapi&s=post&q=index&json=1", chat_req
 	);
 
-	let Some(booru_posts) = get_booru_posts(&url).await.unwrap() else {
+	let Ok(request) = get_booru_posts(&url).await else {
+		return;
+	};
+	let Some(booru_posts) = request else {
 		return;
 	};
 	let mut post_ids: Vec<u64> = vec![];
