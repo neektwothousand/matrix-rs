@@ -323,21 +323,23 @@ async fn match_reaction(
 
 	use matrix_sdk::ruma::events::room::MediaSource;
 	let request = if let MessageType::Image(image) = media_event.content.msgtype {
-		if let MediaSource::Plain(ref mxcuri) = image.source {
+		let image_t = image.clone();
+		let caption_t = caption.clone();
+		tokio::spawn(async move {if let MediaSource::Plain(ref mxcuri) = image_t.source {
 			match url::Url::parse(mxcuri.as_str()) {
 				Ok(u) => {
 					let domain = "https://matrix.org/_matrix/media/v3/download/matrix.org";
 					let path = u.path();
 					let u = url::Url::parse(format!("{}{}", domain, path).as_str()).unwrap();
 					let tgres = tgbot.send_photo(tgnova, InputFile::url(u.clone()))
-						.caption(&caption).await;
+						.caption(caption_t).await;
 					if tgres.is_err() {
 						eprintln!("{:?}\n{:?}", tgres, u);
 					}
 				}
 				Err(e) => eprintln!("{:?}", e),
 			}
-		}
+		}});
 		RoomMessageEventContent::new(MessageType::Image(image))
 	} else if let MessageType::Video(video) = media_event.content.msgtype {
 		RoomMessageEventContent::new(MessageType::Video(video))
@@ -347,43 +349,44 @@ async fn match_reaction(
 			media_event.content.msgtype
 		)));
 	};
-	let sent_media_event_id = to_room_id.send(request).await?.event_id;
-	let original_message = to_room_id
-		.event(&sent_media_event_id)
-		.await?
-		.event
-		.deserialize_as::<RoomMessageEvent>()?;
-	let forward_thread = ForwardThread::No;
-	let add_mentions = AddMentions::No;
-	let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
-		&original_message.as_original().unwrap(),
-		forward_thread,
-		add_mentions,
-	);
-	let sent_text_event_id = to_room_id.send(text_content).await?.event_id;
-
+	tokio::spawn(async move {
+		let sent_media_event_id = to_room_id.send(request).await.unwrap().event_id;
+		let original_message = to_room_id
+			.event(&sent_media_event_id)
+			.await.unwrap()
+			.event
+			.deserialize_as::<RoomMessageEvent>().unwrap();
+		let forward_thread = ForwardThread::No;
+		let add_mentions = AddMentions::No;
+		let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
+			&original_message.as_original().unwrap(),
+			forward_thread,
+			add_mentions,
+		);
+		let sent_text_event_id = to_room_id.send(text_content).await.unwrap().event_id;
+		if let Some(queues) = &user_room.queue {
+			for queue_chat_id in queues {
+				let path = format!("alma-armas/db/queue/{}", to_room_id.room_id().as_str());
+				std::fs::create_dir_all(path.clone()).unwrap();
+				let mut queue_file = std::fs::File::options()
+					.create(true)
+					.append(true)
+					.open(&format!("{path}/{queue_chat_id}"))
+					.unwrap();
+				writeln!(
+					&mut queue_file,
+					"{} {}",
+					sent_media_event_id.as_str(),
+					sent_text_event_id.as_str()
+				)
+				.unwrap();
+			}
+		}
+	});
 
 	room.redact(&media_event_id, None, None).await?;
 	room.redact(&caption_event_id, None, None).await?;
 
-	if let Some(queues) = &user_room.queue {
-		for queue_chat_id in queues {
-			let path = format!("alma-armas/db/queue/{}", to_room_id.room_id().as_str());
-			std::fs::create_dir_all(path.clone()).unwrap();
-			let mut queue_file = std::fs::File::options()
-				.create(true)
-				.append(true)
-				.open(&format!("{path}/{queue_chat_id}"))
-				.unwrap();
-			writeln!(
-				&mut queue_file,
-				"{} {}",
-				sent_media_event_id.as_str(),
-				sent_text_event_id.as_str()
-			)
-			.unwrap();
-		}
-	}
 	Ok(())
 }
 
