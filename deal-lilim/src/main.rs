@@ -108,7 +108,7 @@ async fn main() {
 
 	loop {
 		let client_sync = client.sync(SyncSettings::default()).await;
-		let Err(ref e) = client_sync else {
+		let Err(ref _e) = client_sync else {
 			eprintln!("deal http error");
 			continue;
 		};

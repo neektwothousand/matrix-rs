@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
 
 	loop {
 		let sync_settings = SyncSettings::default().timeout(Duration::from_secs(60));
-		let Err(err) = client.sync(sync_settings).await else {
+		let Err(_err) = client.sync(sync_settings).await else {
 			eprintln!("dana http error");
 			continue;
 		};
