@@ -5,4 +5,5 @@ murmur.log
 /target/
 /alma-armas/db
 /alma-armas/gelbooru_key
+/alma-armas/tgtoken
 /.cargo/
