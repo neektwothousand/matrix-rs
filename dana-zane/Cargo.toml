@@ -7,10 +7,12 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.80"
-matrix-sdk = "0.7.1"
 mime = "0.3.17"
-serde = "1.0.197"
 serde_yaml = "0.9.32"
-tokio = { version = "1.36.0", features = ["full"] }
 zip = "0.6.6"
 
+serde.workspace = true
+matrix-sdk.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
