@@ -46,7 +46,7 @@ pub async fn get_booru_posts(url: &str) -> Result<Option<Vec<BooruPost>>, Box<dy
 	let booru_response = req_client.get(url).send().await?;
 	let response_string = booru_response.text().await?;
 
-	if response_string == "" {
+	if response_string.is_empty() {
 		return Ok(None);
 	}
 
@@ -95,9 +95,9 @@ pub async fn get_booru_posts(url: &str) -> Result<Option<Vec<BooruPost>>, Box<dy
 				md5: Some(danbooru_post.md5),
 				hash: None,
 			};
-			return Ok(Some(vec![booru_post]));
+			Ok(Some(vec![booru_post]))
 		}
-		Err(_) => return Ok(None),
+		Err(_) => Ok(None),
 	}
 }
 
@@ -176,7 +176,7 @@ pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) {
 	let forward_thread = ForwardThread::No;
 	let add_mentions = AddMentions::No;
 	let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
-		&original_message.as_original().unwrap(),
+		original_message.as_original().unwrap(),
 		forward_thread,
 		add_mentions,
 	);
@@ -186,7 +186,10 @@ pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) {
 	for key in ["✅", "❤️", "❌"] {
 		let annotation = Annotation::new(event_id.clone(), key.to_string());
 		let reaction_content = reaction::ReactionEventContent::new(annotation);
-		room.send(reaction_content).await.unwrap();
+		let res = room.send(reaction_content).await;
+		if res.is_err() {
+			eprintln!("{:?}", res);
+		}
 	}
 }
 
@@ -199,7 +202,7 @@ pub async fn get_booru_post_tags(
 		for tag in &booru_room.tags {
 			let tag_match = booru_post
 				.tags
-				.split(" ")
+				.split(' ')
 				.filter(|&booru_tag| booru_tag == tag)
 				.collect::<Vec<&str>>()
 				.pop();
@@ -211,7 +214,7 @@ pub async fn get_booru_post_tags(
 			}
 		}
 	}
-	let mut booru_tags_split: Vec<&str> = booru_post.tags.split(" ").collect();
+	let mut booru_tags_split: Vec<&str> = booru_post.tags.split(' ').collect();
 	let mut booru_tags: Vec<String> = vec![];
 	for booru_tag in booru_tags_split.drain(..) {
 		booru_tags.push("#".to_owned() + &booru_tag);
@@ -226,5 +229,5 @@ pub async fn get_booru_post_tags(
 			break;
 		}
 	}
-	return hashtags;
+	hashtags
 }

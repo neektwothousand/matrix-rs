@@ -122,8 +122,8 @@ async fn get_original_text(reply_event: &TimelineEvent, room: &Room) -> Option<S
 			_ => return None,
 		};
 		match &new_content.msgtype {
-			MessageType::Text(text_message) => return Some(text_message.body.clone()),
-			_ => return None,
+			MessageType::Text(text_message) => Some(text_message.body.clone()),
+			_ => None,
 		}
 	} else if let Ok(message) = reply_event.event.deserialize_as::<RoomMessageEvent>() {
 		let original = message.as_original()?;
@@ -171,7 +171,7 @@ pub async fn match_command(
 	} else {
 		false
 	};
-	let reply_text = get_reply_text(&original_message, room).await;
+	let reply_text = get_reply_text(original_message, room).await;
 	let text = if is_reply {
 		remove_plain_reply_fallback(&command.body)
 	} else {
@@ -212,7 +212,7 @@ pub async fn match_command(
 			.await
 			.ok(),
 		"!sed" => {
-			let args = match text.split_once(" ") {
+			let args = match text.split_once(' ') {
 				Some(split) => split.1,
 				None => return None,
 			};
@@ -272,7 +272,7 @@ pub async fn match_text(
 	} else {
 		&text_message.body
 	};
-	let reply_text = get_reply_text(&original_message, room).await;
+	let reply_text = get_reply_text(original_message, room).await;
 	let original_message = &original_message
 		.clone()
 		.into_full_event(OwnedRoomId::from(room.room_id()));
@@ -300,6 +300,6 @@ pub async fn match_text(
 				.await
 				.ok()
 		}
-		_ => return None,
+		_ => None,
 	}
 }

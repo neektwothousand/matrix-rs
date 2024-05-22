@@ -20,7 +20,6 @@ use ruma_client::{http_client::Hyper, Client};
 use serde::Deserialize;
 use tokio::{spawn, runtime::Runtime};
 use tokio::time::{sleep, Duration};
-use futures_util::TryStreamExt;
 
 const DIS_SOCK: &str = "/tmp/dis-rs.sock";
 const MUR_SOCK: &str = "/tmp/mur-rs.sock";
@@ -29,8 +28,7 @@ static CLIENT: Lazy<Client<Hyper>> = Lazy::new(|| {
 	let rt = Runtime::new().unwrap();
 	let handle = rt.handle();
 	let client_async = Client::builder().build();
-	let client = handle.block_on(client_async).unwrap();
-	client
+	handle.block_on(client_async).unwrap()
 });
 
 
