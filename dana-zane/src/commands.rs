@@ -40,12 +40,9 @@ fn sign_split_vec_str<'a>(
 	let mut vec_str: Option<(Vec<&str>, &str)> = None;
 	for sign in signs.iter() {
 		if reply_text.contains(sign) {
-			match reply_text.split_once(sign) {
-				Some(split) => {
-					vec_str = Some((vec![split.0, split.1], *sign));
-					break;
-				}
-				None => (),
+			if let Some(split) = reply_text.split_once(sign) {
+				vec_str = Some((vec![split.0, split.1], *sign));
+				break;
 			}
 		}
 	}
@@ -154,9 +151,7 @@ async fn get_reply_text(
 	let Ok(reply_event) = room.event(&reply_id).await else {
 		return None;
 	};
-	let Some(reply_text) = get_original_text(&reply_event, room).await else {
-		return None;
-	};
+	let reply_text = get_original_text(&reply_event, room).await?;
 
 	Some(reply_text)
 }
@@ -166,11 +161,7 @@ pub async fn match_command(
 	command: &TextMessageEventContent,
 	original_message: &OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
 ) -> Option<Response> {
-	let is_reply = if let Some(_reply) = &original_message.content.relates_to {
-		true
-	} else {
-		false
-	};
+	let is_reply = original_message.content.relates_to.is_some();
 	let reply_text = get_reply_text(original_message, room).await;
 	let text = if is_reply {
 		remove_plain_reply_fallback(&command.body)
@@ -183,17 +174,11 @@ pub async fn match_command(
 		.clone()
 		.into_full_event(OwnedRoomId::from(room.room_id()));
 
-	let Some(command) = args.next() else {
-		return None;
-	};
+	let command = args.next()?;
 	match command.to_lowercase().as_str() {
 		"!dice" => {
-			let Some(arg) = args.next() else {
-				return None;
-			};
-			let Ok(number) = arg.parse::<u64>() else {
-				return None;
-			};
+			let arg = args.next()?;
+			let number = arg.parse::<u64>().ok()?;
 			use std::collections::HashMap;
 			let mut hm = HashMap::new();
 			for x in 1..=number {
@@ -216,10 +201,8 @@ pub async fn match_command(
 				Some(split) => split.1,
 				None => return None,
 			};
-			let Some(reply_text) = reply_text else {
-				return None;
-			};
-			let text = cmd("sed", vec!["--sandbox", args], Some(reply_text));
+			let stdin_str = reply_text?;
+			let text = cmd("sed", vec!["--sandbox", args], Some(stdin_str));
 			SendMessage::text(room, &text)
 				.await
 				.reply(original_message)
@@ -231,7 +214,7 @@ pub async fn match_command(
 				zip::ZipWriter::new(
 					std::fs::OpenOptions::new()
 						.write(true)
-						.create(true)
+						.truncate(true)
 						.open("source.zip")
 						.unwrap(),
 				)
@@ -262,11 +245,7 @@ pub async fn match_text(
 	text_message: &TextMessageEventContent,
 	original_message: &OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
 ) -> Option<Response> {
-	let is_reply = if let Some(_reply) = &original_message.content.relates_to {
-		true
-	} else {
-		false
-	};
+	let is_reply = original_message.content.relates_to.is_some();
 	let text = if is_reply {
 		remove_plain_reply_fallback(&text_message.body)
 	} else {
@@ -278,9 +257,7 @@ pub async fn match_text(
 		.into_full_event(OwnedRoomId::from(room.room_id()));
 	match text.to_lowercase().as_str() {
 		"quanto fa" => {
-			let Some(reply_text) = reply_text else {
-				return None;
-			};
+			let reply_text = reply_text?;
 
 			let signs = vec![" x ", " * ", " + ", " - ", " / ", "*", "+", "-", "/"];
 			let (vec_str, sign) = sign_split_vec_str(&reply_text, signs)?;

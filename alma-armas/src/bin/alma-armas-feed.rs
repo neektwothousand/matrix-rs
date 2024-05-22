@@ -25,7 +25,7 @@ async fn has_md5(feed: &str, md5: &str) -> bool {
 		.create(true)
 		.write(true)
 		.read(true)
-		.open(&format!("{path}/md5"))
+		.open(format!("{path}/md5"))
 		.unwrap();
 	let md5_reader = std::io::BufReader::new(md5_file);
 	for line in md5_reader.lines() {
@@ -40,7 +40,7 @@ async fn write_md5(feed: &str, md5: &str) {
 	let path = format!("alma-armas/db/{feed}");
 	let mut md5_file = std::fs::File::options()
 		.append(true)
-		.open(&format!("{path}/md5"))
+		.open(format!("{path}/md5"))
 		.unwrap();
 	writeln!(&mut md5_file, "{}", md5).unwrap();
 }
@@ -52,27 +52,27 @@ async fn read_lastid(feed: &str, tag: &str, rating: &str, website: &str) -> u64 
 		.create(true)
 		.write(true)
 		.read(true)
-		.open(&format!("{path}/lastid"))
+		.open(format!("{path}/lastid"))
 		.unwrap();
 	let mut lastid_reader = std::io::BufReader::new(lastid_file);
 	let mut lastid_str = String::new();
 	lastid_reader.read_line(&mut lastid_str).unwrap();
 	lastid_str = lastid_str.trim().to_string();
 
-	if lastid_str == "" {
+	if lastid_str.is_empty() {
 		if website.contains("api") {
-			return 8115133;
+			8115133
 		} else {
-			return 8685574;
+			8685574
 		}
 	} else {
-		return lastid_str.parse::<u64>().unwrap();
+		lastid_str.parse::<u64>().unwrap()
 	}
 }
 
 async fn write_lastid(feed: &str, tag: &str, rating: &str, website: &str, lastid: u64) {
 	let path = format!("alma-armas/db/{feed}/{tag}/{rating}/{website}/");
-	let mut lastid_file = std::fs::File::create(&format!("{path}/lastid")).unwrap();
+	let mut lastid_file = std::fs::File::create(format!("{path}/lastid")).unwrap();
 	writeln!(&mut lastid_file, "{}", lastid).unwrap();
 }
 
@@ -119,7 +119,7 @@ async fn send_posts_in_chat(
 			let mut hashtags_sub: Vec<String> = vec![];
 			for (pattern, sub) in replace {
 				for tag in hashtags.drain(..) {
-					if tag.contains(*&pattern) {
+					if tag.contains(pattern) {
 						hashtags_sub.push(tag.replace(pattern, sub));
 					} else {
 						hashtags_sub.push(tag);
@@ -184,7 +184,7 @@ async fn send_posts_in_booru(client: &Client, booru: &Booru) {
 		.join("+");
 	println!("start {}", booru.name);
 	for chat in &booru.chats {
-		send_posts_in_chat(&client, &base_req, &api_key, &booru, &chat).await;
+		send_posts_in_chat(client, &base_req, &api_key, booru, chat).await;
 	}
 	println!("end {}", booru.name);
 }
@@ -192,7 +192,7 @@ async fn send_posts_in_booru(client: &Client, booru: &Booru) {
 async fn send_posts(client: &Client) {
 	let booru_list = read_booru().unwrap();
 	let to_join = booru_list.iter().map(|booru| {
-		return send_posts_in_booru(&client, &booru);
+		return send_posts_in_booru(client, booru);
 	});
 	futures::future::join_all(to_join).await;
 }

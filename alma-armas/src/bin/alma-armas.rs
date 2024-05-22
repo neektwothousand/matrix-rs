@@ -32,28 +32,19 @@ fn get_url_query(is_url: bool, query: &str, user_id: &UserId) -> Option<(Url, bo
 	let inline_markup: bool;
 	if is_url {
 		let url = Url::parse(query).ok()?;
-		let url_query: String;
 		let url_domain = url.domain()?;
-		if url_domain == "danbooru.donmai.us" {
-			let post_id = match url.path_segments() {
-				Some(segments) => {
-					let Some(last_seg) = segments.last() else {
-						return None;
-					};
-					last_seg.parse::<u64>().ok()?
-				}
-				None => return None,
-			};
-			url_query = format!("https://{}/posts/{post_id}.json", url_domain);
+		let url_query = if url_domain == "danbooru.donmai.us" {
+			let segments = url.path_segments()?;
+			let last_seg = segments.last()?;
+			let post_id = last_seg.parse::<u64>().ok()?;
+			format!("https://{}/posts/{post_id}.json", url_domain)
 		} else {
-			let Some(post_id_query) = url.query_pairs().find(|q| q.0 == Cow::Borrowed("id")) else {
-				return None;
-			};
-			url_query = format!(
+			let post_id_query = url.query_pairs().find(|q| q.0 == Cow::Borrowed("id"))?; 
+			format!(
 				"https://{}/index.php?page=dapi&s=post&q=index&json=1&{}={}",
 				url_domain, post_id_query.0, post_id_query.1
-			);
-		}
+			)
+		};
 
 		let booru_users = read_users().unwrap();
 		if let Some(_booru_user) = booru_users.iter().find(|&user| user.id == user_id.as_str()) {
@@ -61,14 +52,14 @@ fn get_url_query(is_url: bool, query: &str, user_id: &UserId) -> Option<(Url, bo
 		} else {
 			inline_markup = false;
 		}
-		return Some((Url::parse(&url_query).ok()?, inline_markup));
+		Some((Url::parse(&url_query).ok()?, inline_markup))
 	} else {
 		let url_query = format!(
 			"https://gelbooru.com/{}&tags={query}",
 			"index.php?page=dapi&s=post&q=index&json=1"
 		);
 		inline_markup = false;
-		return Some((Url::parse(&url_query).ok()?, inline_markup));
+		Some((Url::parse(&url_query).ok()?, inline_markup))
 	}
 }
 
@@ -102,23 +93,14 @@ async fn match_command(
 	room: &Room,
 	mut args: SplitWhitespace<'_>,
 ) -> Option<String> {
+	#[allow(clippy::single_match)]
 	match command {
 		"!booru" => {
 			let message_user = event.sender;
-			let Some(message_arg) = args.next() else {
-				return None;
-			};
-			let is_url = match Url::parse(message_arg) {
-				Ok(_) => true,
-				Err(_) => false,
-			};
-			let Some(url_query) = get_url_query(is_url, message_arg, &message_user) else {
-				return None;
-			};
-			let Some(domain) = url_query.0.domain() else {
-				return None;
-			};
-
+			let message_arg = args.next()?;
+			let is_url = Url::parse(message_arg).is_ok();
+			let url_query = get_url_query(is_url, message_arg, &message_user)?;
+			let domain = url_query.0.domain()?;
 			let booru_posts = match get_booru_posts(url_query.0.as_str()).await {
 				Ok(booru_posts) => booru_posts,
 				Err(err) => {
@@ -135,11 +117,9 @@ async fn match_command(
 				None => return None,
 			};
 
-			let Some(post) = booru_posts.get(0) else {
-				return None;
-			};
+			let post = booru_posts.first()?;
 
-			let hashtags = get_booru_post_tags(&post, None).await;
+			let hashtags = get_booru_post_tags(post, None).await;
 			let source = if domain == "danbooru.donmai.us" {
 				format!("https://{domain}/posts/{}", post.id)
 			} else {
@@ -156,12 +136,12 @@ async fn match_command(
 				)
 			);
 
-			send_feed_post(&room, post.clone(), &caption).await;
+			send_feed_post(room, post.clone(), &caption).await;
 		}
 		_ => (),
 	}
 
-	return None;
+	None
 }
 
 async fn handle_reaction_event(
@@ -176,10 +156,10 @@ async fn handle_reaction_event(
 		return Ok(());
 	};
 	match match_reaction(original_event, &room).await {
-		Ok(_) => return Ok(()),
+		Ok(_) => Ok(()),
 		Err(err) => {
 			eprintln!("{}", err);
-			return Ok(());
+			Ok(())
 		}
 	}
 }
@@ -189,15 +169,15 @@ fn parse_caption_hashtags(caption: &str) -> Option<Vec<String>> {
 	let split = caption.split_whitespace();
 
 	for word in split {
-		if word.starts_with("#") {
+		if word.starts_with('#') {
 			hashtags.push(word.to_string());
 		}
 	}
 
-	if hashtags.len() == 0 {
-		return None;
+	if hashtags.is_empty() {
+		None
 	} else {
-		return Some(hashtags);
+		Some(hashtags)
 	}
 }
 
@@ -259,7 +239,7 @@ async fn match_reaction(
 		}
 	}
 	let mut source = String::new();
-	if let Ok(url) = url::Url::parse(caption_event_text.split("—").last().unwrap().trim()) {
+	if let Ok(url) = url::Url::parse(caption_event_text.split('—').last().unwrap().trim()) {
 		source = url.to_string();
 	}
 
@@ -359,7 +339,7 @@ async fn match_reaction(
 		let forward_thread = ForwardThread::No;
 		let add_mentions = AddMentions::No;
 		let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
-			&original_message.as_original().unwrap(),
+			original_message.as_original().unwrap(),
 			forward_thread,
 			add_mentions,
 		);
@@ -432,7 +412,7 @@ async fn main() {
 	client.add_event_handler(handle_reaction_event);
 	loop {
 		let sync = client.sync(SyncSettings::default()).await;
-		if let Err(_) = sync {
+		if sync.is_err() {
 			eprintln!("alma-armas http error, retrying");
 			continue;
 		};

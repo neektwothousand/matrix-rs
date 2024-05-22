@@ -56,7 +56,7 @@ async fn read_sock(room: &'static Room, socket: &str) {
 			let content = RoomMessageEventContent::text_plain(sock_message);
 			match room.send(content).await {
 				Ok(res) => {
-					delete_message(&room, res).await;
+					delete_message(room, res).await;
 				}
 				Err(err) => eprintln!("{:?}", err),
 			}
@@ -103,7 +103,7 @@ async fn main() {
 		if Path::new(socket).exists() {
 			fs::remove_file(socket).unwrap();
 		}
-		spawn(read_sock(&room, socket));
+		spawn(read_sock(room, socket));
 	}
 
 	loop {

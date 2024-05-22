@@ -50,19 +50,13 @@ pub async fn get_booru_posts(url: &str) -> Result<Option<Vec<BooruPost>>, Box<dy
 		return Ok(None);
 	}
 
-	match from_str::<GelbooruSource>(&response_string) {
-		Ok(gelbooru) => {
-			if let Some(posts) = gelbooru.post {
-				return Ok(Some(posts));
-			}
-		}
-		Err(_) => (),
-	}
-	match from_str::<Vec<BooruPost>>(&response_string) {
-		Ok(posts) => {
+	if let Ok(gelbooru) = from_str::<GelbooruSource>(&response_string) {
+		if let Some(posts) = gelbooru.post {
 			return Ok(Some(posts));
 		}
-		Err(_) => (),
+	}
+	if let Ok(posts) = from_str::<Vec<BooruPost>>(&response_string) {
+		return Ok(Some(posts));
 	}
 	match from_str::<DanbooruPost>(&response_string) {
 		Ok(danbooru_post) => {
@@ -206,18 +200,15 @@ pub async fn get_booru_post_tags(
 				.filter(|&booru_tag| booru_tag == tag)
 				.collect::<Vec<&str>>()
 				.pop();
-			match tag_match {
-				Some(tag) => {
-					hashtags.push("#".to_owned() + tag);
-				}
-				None => (),
+			if let Some(tag) = tag_match {
+				hashtags.push("#".to_owned() + tag);
 			}
 		}
 	}
 	let mut booru_tags_split: Vec<&str> = booru_post.tags.split(' ').collect();
 	let mut booru_tags: Vec<String> = vec![];
 	for booru_tag in booru_tags_split.drain(..) {
-		booru_tags.push("#".to_owned() + &booru_tag);
+		booru_tags.push("#".to_owned() + booru_tag);
 	}
 	let mut rng = rand::thread_rng();
 	booru_tags.shuffle(&mut rng);

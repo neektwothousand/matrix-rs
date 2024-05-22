@@ -20,6 +20,7 @@ use ruma_client::{http_client::Hyper, Client};
 use serde::Deserialize;
 use tokio::{spawn, runtime::Runtime};
 use tokio::time::{sleep, Duration};
+use futures_util::TryStreamExt;
 
 const DIS_SOCK: &str = "/tmp/dis-rs.sock";
 const MUR_SOCK: &str = "/tmp/mur-rs.sock";
@@ -77,7 +78,7 @@ async fn read_sock(room: &'static Room, client: &'static Client<Hyper>, socket: 
 			let res = client.send_request(message_request).await;
 			match res {
 				Ok(res) => {
-					delete_message(&room, res).await;
+					delete_message(room, res).await;
 				}
 				Err(err) => eprintln!("{:?}", err),
 			}
@@ -115,19 +116,17 @@ async fn polling(bot: Bot) {
 		if Path::new(socket).exists() {
 			fs::remove_file(socket).unwrap();
 		}
-		spawn(read_sock(&room, &CLIENT, socket));
+		spawn(read_sock(room, &CLIENT, socket));
 	}
 
 	let filter = None;
 	let since = String::new();
 	let set_presence = PresenceState::Online;
 	let timeout = Some(Duration::new(30, 0));
+	let mut stream = Box::pin(CLIENT.sync(filter, since, set_presence, timeout));
 	loop {
-		let mut stream = Box::pin(CLIENT.sync(filter, since, set_presence, timeout));
-		loop {
-			stream.try_next().await.unwrap();
-			sleep(Duration::new(10, 0)).await;
-		}
+		stream.try_next().await.unwrap();
+		sleep(Duration::new(10, 0)).await;
 	}
 }
 
