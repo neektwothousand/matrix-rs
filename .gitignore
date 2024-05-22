@@ -7,3 +7,5 @@ murmur.log
 /alma-armas/gelbooru_key
 /alma-armas/tgtoken
 /.cargo/
+rust-toolchain.toml
+Cross.toml
