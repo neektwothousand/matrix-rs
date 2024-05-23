@@ -379,8 +379,12 @@ async fn match_reaction(
 		}
 	});
 
-	room.redact(&media_event_id, None, None).await?;
-	room.redact(&caption_event_id, None, None).await?;
+	async fn redact(room: Room, event_id: OwnedEventId) -> anyhow::Result<()> {
+		room.redact(&event_id, None, None).await?;
+		Ok(())
+	}
+	tokio::spawn(redact(room.clone(), media_event_id.clone()));
+	tokio::spawn(redact(room.clone(), caption_event_id.clone()));
 
 	Ok(())
 }
