@@ -426,8 +426,10 @@ async fn main() {
 
 	client.add_event_handler(handle_message_event);
 	client.add_event_handler(handle_reaction_event);
+	let sync_settings = Rc::new(SyncSettings::default().timeout(Duration::from_millis(100)));
 	loop {
-		let sync = client.sync(SyncSettings::default()).await;
+		let sync_settings = Rc::clone(&sync_settings);
+		let sync = client.sync(Rc::unwrap_or_clone(sync_settings)).await;
 		if sync.is_err() {
 			eprintln!("alma-armas http error, retrying");
 			continue;
