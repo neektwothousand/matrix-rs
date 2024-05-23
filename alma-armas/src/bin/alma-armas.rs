@@ -1,8 +1,10 @@
 use anyhow::Error;
+use lazy_static::lazy_static;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::room::Room;
 use matrix_sdk::ruma::events::reaction::ReactionEventContent;
 use matrix_sdk::ruma::events::reaction::SyncReactionEvent;
+use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::room::message::AddMentions;
 use matrix_sdk::ruma::events::room::message::ForwardThread;
 use matrix_sdk::ruma::events::room::message::Relation;
@@ -19,14 +21,32 @@ use matrix_sdk::Client;
 use rand::seq::SliceRandom;
 use serde::Deserialize;
 use std::borrow::Cow;
+use std::fs::read_to_string;
 use std::io::Write;
+use std::rc::Rc;
 use std::str::SplitWhitespace;
+use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use url::Url;
-
 use alma_armas::UserRoom;
 use alma_armas::{get_booru_post_tags, get_booru_posts, read_users, send_feed_post};
+use teloxide::types::{ChatId, InputFile};
+use teloxide::prelude::Requester;
+use teloxide::payloads::SendPhotoSetters;
+
+#[derive(Deserialize)]
+struct User {
+	name: String,
+	password: String,
+}
+
+const TGTOKEN_PATH: &str = "alma-armas/tgtoken";
+
+lazy_static! {
+	static ref TGTOKEN: String = read_to_string(TGTOKEN_PATH).unwrap();
+	static ref TGBOT: teloxide::Bot = teloxide::Bot::new(TGTOKEN.clone());
+}
 
 fn get_url_query(is_url: bool, query: &str, user_id: &UserId) -> Option<(Url, bool)> {
 	let inline_markup: bool;
@@ -294,14 +314,8 @@ async fn match_reaction(
 		.unwrap()
 		.to_owned();
 
-	use teloxide::types::{ChatId, InputFile};
-	use teloxide::prelude::Requester;
-	use teloxide::payloads::SendPhotoSetters;
-	let token: String = std::fs::read_to_string("alma-armas/tgtoken").unwrap();
-	let tgbot = teloxide::Bot::new(token);
 	let tgnova = ChatId(-1001434279006);
 
-	use matrix_sdk::ruma::events::room::MediaSource;
 	let request = if let MessageType::Image(image) = media_event.content.msgtype {
 		let image_t = image.clone();
 		let caption_t = caption.clone();
@@ -311,7 +325,8 @@ async fn match_reaction(
 					let domain = "https://matrix.org/_matrix/media/v3/download/matrix.org";
 					let path = u.path();
 					let u = url::Url::parse(format!("{}{}", domain, path).as_str()).unwrap();
-					let tgres = tgbot.send_photo(tgnova, InputFile::url(u.clone()))
+					let tgfile = InputFile::memory(reqwest::get(u.clone()).await.unwrap().bytes().await.unwrap());
+					let tgres = TGBOT.send_photo(tgnova, tgfile)
 						.caption(caption_t).await;
 					if tgres.is_err() {
 						eprintln!("{:?}\n{:?}", tgres, u);
@@ -407,6 +422,8 @@ async fn main() {
 		f.write_all(response.device_id.as_bytes()).await.unwrap();
 	}
 	client.sync_once(SyncSettings::default()).await.unwrap();
+
+	lazy_static::initialize(&TGBOT);
 
 	client.add_event_handler(handle_message_event);
 	client.add_event_handler(handle_reaction_event);
