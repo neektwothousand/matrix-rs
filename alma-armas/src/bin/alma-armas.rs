@@ -389,12 +389,7 @@ async fn match_reaction(
 	Ok(())
 }
 
-#[derive(Deserialize)]
-struct User {
-	name: String,
-	password: String,
-}
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
 	let user: User = serde_yaml::from_reader(std::fs::File::open("alma.yaml").unwrap()).unwrap();
 	let user_id = UserId::parse(&user.name).unwrap();
