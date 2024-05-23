@@ -1,3 +1,18 @@
+use futures_util::TryStreamExt;
+use matrix_sdk_base::{
+	crypto::{store::MemoryStore, OlmMachine},
+	once_cell::sync::Lazy,
+	ruma::{
+		api::client::{message::send_message_event, redact::redact_event},
+		DeviceId, TransactionId,
+	},
+	ruma::{events::room::message::RoomMessageEventContent, RoomId, UserId},
+	ruma::{presence::PresenceState, OwnedDeviceId},
+	store::StoreConfig,
+	BaseClient, Room,
+};
+use ruma_client::{http_client::Hyper, Client};
+use serde::Deserialize;
 use std::{
 	fs::{self, File},
 	io::Read,
@@ -5,22 +20,8 @@ use std::{
 	path::Path,
 	sync::Arc,
 };
-use matrix_sdk_base::{
-	crypto::{store::MemoryStore, OlmMachine},
-	ruma::{
-		api::client::{message::send_message_event, redact::redact_event},
-		DeviceId, TransactionId, 
-	},
-	ruma::{events::room::message::RoomMessageEventContent, RoomId, UserId},
-	ruma::{presence::PresenceState, OwnedDeviceId},
-	store::StoreConfig,
-	BaseClient, Room, once_cell::sync::Lazy,
-};
-use ruma_client::{http_client::Hyper, Client};
-use serde::Deserialize;
-use tokio::{spawn, runtime::Runtime};
 use tokio::time::{sleep, Duration};
-use futures_util::TryStreamExt;
+use tokio::{runtime::Runtime, spawn};
 
 const DIS_SOCK: &str = "/tmp/dis-rs.sock";
 const MUR_SOCK: &str = "/tmp/mur-rs.sock";
@@ -32,7 +33,6 @@ static CLIENT: Lazy<Client<Hyper>> = Lazy::new(|| {
 	handle.block_on(client_async).unwrap()
 });
 
-
 #[derive(Deserialize)]
 struct Bot {
 	name: String,
@@ -40,10 +40,7 @@ struct Bot {
 	room_id: String,
 }
 
-async fn delete_message(
-	room: &'static Room,
-	res: send_message_event::v3::Response,
-) {
+async fn delete_message(room: &'static Room, res: send_message_event::v3::Response) {
 	let event_id = res.event_id;
 	sleep(Duration::new(3600, 0)).await;
 	let txn_id = TransactionId::new().to_owned();
@@ -97,7 +94,8 @@ async fn polling(bot: Bot) {
 	} else {
 		DeviceId::new()
 	};
-	CLIENT.log_in(&bot.name, &bot.password, Some(&device_id), None)
+	CLIENT
+		.log_in(&bot.name, &bot.password, Some(&device_id), None)
 		.await
 		.unwrap();
 

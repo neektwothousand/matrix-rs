@@ -98,7 +98,7 @@ async fn main() {
 	let room_id = RoomId::parse(&user.room_id).unwrap();
 	let room: &'static Room = Box::leak(Box::new(client.get_room(&room_id).unwrap()));
 	let sockets = [DIS_SOCK, MUR_SOCK];
-	
+
 	for socket in sockets {
 		if Path::new(socket).exists() {
 			fs::remove_file(socket).unwrap();
