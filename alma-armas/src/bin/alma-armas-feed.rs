@@ -143,11 +143,16 @@ async fn send_posts_in_chat(
 			.get_room(&RoomId::parse(room.id.clone()).unwrap())
 			.unwrap();
 		if !has_md5(&booru.name, &hash).await {
-			send_feed_post(&joined_room, booru_post.clone(), &caption).await.ok()?;
-			write_md5(&booru.name, &hash).await;
+			let send = send_feed_post(&joined_room, booru_post.clone(), &caption).await;
+			match send {
+				Ok(_) => {
+					write_md5(&booru.name, &hash).await;
+					post_ids.push(booru_post.id);
+				}
+				Err(err) => eprintln!("{:?}", err),
+			}
 		}
 
-		post_ids.push(booru_post.id);
 		std::thread::sleep(Duration::from_secs(5));
 	}
 	let max_id = post_ids.iter().fold(0, |acc, id| acc.max(*id));
