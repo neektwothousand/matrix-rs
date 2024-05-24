@@ -99,21 +99,18 @@ pub async fn get_booru_posts(url: &str) -> Result<Option<Vec<BooruPost>>, Box<dy
 
 pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) -> anyhow::Result<()> {
 	let file_url = url::Url::parse(&booru_post.file_url)?;
-	let extension = Path::new(file_url.path()).extension().context("");
-	let extension_str = extension.context("")?.to_str().context("")?;
+	let extension = Path::new(file_url.path()).extension().context("ext");
+	let extension_str = extension.context("")?.to_str().context("ext")?;
 	let content_type = match extension_str {
 		"jpg" | "jpeg" => "image/jpeg".parse::<Mime>()?,
 		"png" => "image/png".parse::<Mime>()?,
 		"mp4" => "video/mp4".parse::<Mime>()?,
-		_ => return Err(anyhow!("")),
+		_ => return Err(anyhow!("invalid ext")),
 	};
 	let client = room.client();
-	if client.matrix_auth().refresh_token().is_none() {
-		client.refresh_access_token().await.context("cannot refresh token")?;
-	}
 	let event_id = match content_type.essence_str() {
 		"image/jpeg" | "image/png" => {
-			let body = file_url.path_segments().context("")?.last().context("")?;
+			let body = file_url.path_segments().context("cannot be a base")?.last().context("")?;
 
 			let request = reqwest::get(file_url.clone()).await?;
 			let data = request.bytes().await?;
