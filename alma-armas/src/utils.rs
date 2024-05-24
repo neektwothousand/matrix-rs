@@ -1,7 +1,9 @@
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
 
+use anyhow::{anyhow, Context};
 use matrix_sdk::ruma::events::relation::Annotation;
 use matrix_sdk::ruma::events::room::message::{
 	AddMentions, ForwardThread, ImageMessageEventContent, MessageType, RoomMessageEvent,
@@ -95,68 +97,52 @@ pub async fn get_booru_posts(url: &str) -> Result<Option<Vec<BooruPost>>, Box<dy
 	}
 }
 
-pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) {
-	let Ok(file_url) = url::Url::parse(&booru_post.file_url) else {
-		return;
-	};
-	let Some(extension) = std::path::Path::new(file_url.path()).extension() else {
-		return;
-	};
-	let Some(extension_str) = extension.to_str() else {
-		return;
-	};
+pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) -> anyhow::Result<()> {
+	let file_url = url::Url::parse(&booru_post.file_url)?;
+	let extension = Path::new(file_url.path()).extension().context("");
+	let extension_str = extension.context("")?.to_str().context("")?;
 	let content_type = match extension_str {
-		"jpg" | "jpeg" => "image/jpeg".parse::<Mime>().unwrap(),
-		"png" => "image/png".parse::<Mime>().unwrap(),
-		"mp4" => "video/mp4".parse::<Mime>().unwrap(),
-		_ => return,
+		"jpg" | "jpeg" => "image/jpeg".parse::<Mime>()?,
+		"png" => "image/png".parse::<Mime>()?,
+		"mp4" => "video/mp4".parse::<Mime>()?,
+		_ => return Err(anyhow!("")),
 	};
+	let client = room.client();
+	if client.matrix_auth().refresh_token().is_none() {
+		client.refresh_access_token().await.context("cannot refresh token")?;
+	}
 	let event_id = match content_type.essence_str() {
 		"image/jpeg" | "image/png" => {
-			let body = file_url.path_segments().unwrap().last().unwrap();
+			let body = file_url.path_segments().context("")?.last().context("")?;
 
-			let Ok(request) = reqwest::get(file_url.clone()).await else {
-				return;
-			};
-			let Ok(data) = request.bytes().await else {
-				return;
-			};
-			let mxc_url = room
-				.client()
+			let request = reqwest::get(file_url.clone()).await?;
+			let data = request.bytes().await?;
+			let mxc_url = client
 				.media()
 				.upload(&content_type, data.to_vec())
-				.await
-				.unwrap()
+				.await.context("can't upload")?
 				.content_uri;
 
 			let image_message = ImageMessageEventContent::plain(body.to_string(), mxc_url);
 			let room_message = RoomMessageEventContent::new(MessageType::Image(image_message));
-			if let Ok(message) = room.send(room_message).await {
-				message.event_id
-			} else {
-				return;
-			}
+			room.send(room_message).await?.event_id
 		}
 		"video/mp4" => {
-			let body = file_url.path_segments().unwrap().last().unwrap();
+			let body = file_url.path_segments().context("")?.last().context("")?;
 
-			let Ok(request) = reqwest::get(file_url.clone()).await else {
-				return;
-			};
-			let data = request.bytes().await.unwrap();
-			let mxc_url = room
-				.client()
+			let request = reqwest::get(file_url.clone()).await?;
+			let data = request.bytes().await?;
+			let mxc_url = client
 				.media()
 				.upload(&content_type, data.to_vec())
-				.await
-				.unwrap()
+				.await?
 				.content_uri;
 
 			let video_message = VideoMessageEventContent::plain(body.to_string(), mxc_url);
 			let room_message = RoomMessageEventContent::new(MessageType::Video(video_message));
-			room.send(room_message).await.unwrap().event_id
+			room.send(room_message).await?.event_id
 		}
-		_ => return,
+		_ => return Err(anyhow!("")),
 	};
 
 	let timeline_event = loop {
@@ -168,15 +154,15 @@ pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) {
 	let original_message = timeline_event
 		.event
 		.deserialize_as::<RoomMessageEvent>()
-		.unwrap();
+		?;
 	let forward_thread = ForwardThread::No;
 	let add_mentions = AddMentions::No;
 	let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
-		original_message.as_original().unwrap(),
+		original_message.as_original().context("")?,
 		forward_thread,
 		add_mentions,
 	);
-	let event_id = room.send(text_content).await.unwrap().event_id;
+	let event_id = room.send(text_content).await?.event_id;
 
 	use matrix_sdk::ruma::events::reaction;
 	for key in ["✅", "❤️", "❌"] {
@@ -187,6 +173,7 @@ pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) {
 			eprintln!("{:?}", res);
 		}
 	}
+	Ok(())
 }
 
 pub async fn get_booru_post_tags(

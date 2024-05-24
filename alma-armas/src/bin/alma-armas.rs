@@ -25,7 +25,6 @@ use serde::Deserialize;
 use std::borrow::Cow;
 use std::fs::read_to_string;
 use std::io::Write;
-use std::rc::Rc;
 use std::str::SplitWhitespace;
 use std::time::Duration;
 use teloxide::payloads::SendPhotoSetters;
@@ -156,7 +155,7 @@ async fn match_command(
 				)
 			);
 
-			send_feed_post(room, post.clone(), &caption).await;
+			send_feed_post(room, post.clone(), &caption).await.ok()?;
 		}
 		_ => (),
 	}
@@ -323,9 +322,10 @@ async fn match_reaction(
 			if let MediaSource::Plain(ref mxcuri) = image_t.source {
 				match url::Url::parse(mxcuri.as_str()) {
 					Ok(u) => {
-						let domain = "https://matrix.org/_matrix/media/v3/download/matrix.org";
+						let domain = "matrix.archneek.me";
+						let url = format!("https://{domain}/_matrix/media/v3/download/{domain}");
 						let path = u.path();
-						let u = url::Url::parse(format!("{}{}", domain, path).as_str()).unwrap();
+						let u = url::Url::parse(format!("{}{}", url, path).as_str()).unwrap();
 						let tgfile = InputFile::memory(
 							reqwest::get(u.clone())
 								.await
@@ -352,42 +352,41 @@ async fn match_reaction(
 			media_event.content.msgtype
 		)));
 	};
-	tokio::spawn(async move {
-		let sent_media_event_id = to_room_id.send(request).await.unwrap().event_id;
-		let original_message = to_room_id
-			.event(&sent_media_event_id)
-			.await
-			.unwrap()
-			.event
-			.deserialize_as::<RoomMessageEvent>()
-			.unwrap();
-		let forward_thread = ForwardThread::No;
-		let add_mentions = AddMentions::No;
-		let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
-			original_message.as_original().unwrap(),
-			forward_thread,
-			add_mentions,
-		);
-		let sent_text_event_id = to_room_id.send(text_content).await.unwrap().event_id;
-		if let Some(queues) = &user_room.queue {
-			for queue_chat_id in queues {
-				let path = format!("alma-armas/db/queue/{}", to_room_id.room_id().as_str());
-				std::fs::create_dir_all(path.clone()).unwrap();
-				let mut queue_file = std::fs::File::options()
-					.create(true)
-					.append(true)
-					.open(&format!("{path}/{queue_chat_id}"))
-					.unwrap();
-				writeln!(
-					&mut queue_file,
-					"{} {}",
-					sent_media_event_id.as_str(),
-					sent_text_event_id.as_str()
-				)
+
+	let sent_media_event_id = to_room_id.send(request).await.unwrap().event_id;
+	let original_message = to_room_id
+		.event(&sent_media_event_id)
+		.await
+		.unwrap()
+		.event
+		.deserialize_as::<RoomMessageEvent>()
+		.unwrap();
+	let forward_thread = ForwardThread::No;
+	let add_mentions = AddMentions::No;
+	let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(
+		original_message.as_original().unwrap(),
+		forward_thread,
+		add_mentions,
+	);
+	let sent_text_event_id = to_room_id.send(text_content).await.unwrap().event_id;
+	if let Some(queues) = &user_room.queue {
+		for queue_chat_id in queues {
+			let path = format!("alma-armas/db/queue/{}", to_room_id.room_id().as_str());
+			std::fs::create_dir_all(path.clone()).unwrap();
+			let mut queue_file = std::fs::File::options()
+				.create(true)
+				.append(true)
+				.open(&format!("{path}/{queue_chat_id}"))
 				.unwrap();
-			}
+			writeln!(
+				&mut queue_file,
+				"{} {}",
+				sent_media_event_id.as_str(),
+				sent_text_event_id.as_str()
+			)
+			.unwrap();
 		}
-	});
+	}
 
 	async fn redact(room: Room, event_id: OwnedEventId) -> anyhow::Result<()> {
 		room.redact(&event_id, None, None).await?;
@@ -404,6 +403,7 @@ async fn main() {
 	let user: User = serde_yaml::from_reader(std::fs::File::open("alma.yaml").unwrap()).unwrap();
 	let user_id = UserId::parse(&user.name).unwrap();
 	let client = Client::builder()
+		.handle_refresh_tokens()
 		.sqlite_store("alma_sqlite_store", None)
 		.server_name(user_id.server_name())
 		.build()
@@ -436,12 +436,12 @@ async fn main() {
 
 	client.add_event_handler(handle_message_event);
 	client.add_event_handler(handle_reaction_event);
-	let sync_settings = Rc::new(SyncSettings::default().timeout(Duration::from_millis(100)));
+	let sync_settings = SyncSettings::default()
+		.timeout(Duration::from_millis(100));
 	loop {
-		let sync_settings = Rc::clone(&sync_settings);
-		let sync = client.sync(Rc::unwrap_or_clone(sync_settings)).await;
+		let sync = client.sync(sync_settings.clone()).await;
 		if sync.is_err() {
-			eprintln!("alma-armas http error, retrying");
+			eprintln!("{:?}", sync);
 			continue;
 		};
 	}

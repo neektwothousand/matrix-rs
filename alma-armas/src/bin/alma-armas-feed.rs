@@ -9,9 +9,7 @@ use matrix_sdk::{
 };
 use serde::Deserialize;
 use std::{
-	io::{BufRead, Write},
-	thread::sleep,
-	time::Duration,
+	io::{BufRead, Write}, time::Duration
 };
 use tokio::{
 	fs::File,
@@ -82,7 +80,7 @@ async fn send_posts_in_chat(
 	api_key: &str,
 	booru: &Booru,
 	room: &BooruRoom,
-) {
+) -> Option<()> {
 	let amount = booru.amount;
 	let lastid = read_lastid(
 		&booru.name,
@@ -98,12 +96,8 @@ async fn send_posts_in_chat(
 		booru.website, "index.php?page=dapi&s=post&q=index&json=1", chat_req
 	);
 
-	let Ok(request) = get_booru_posts(&url).await else {
-		return;
-	};
-	let Some(booru_posts) = request else {
-		return;
-	};
+	let request = get_booru_posts(&url).await.ok()?; 
+	let booru_posts = request?;
 	let mut post_ids: Vec<u64> = vec![];
 	for booru_post in booru_posts {
 		let hash = match booru_post.clone().md5 {
@@ -149,11 +143,12 @@ async fn send_posts_in_chat(
 			.get_room(&RoomId::parse(room.id.clone()).unwrap())
 			.unwrap();
 		if !has_md5(&booru.name, &hash).await {
-			send_feed_post(&joined_room, booru_post.clone(), &caption).await;
+			send_feed_post(&joined_room, booru_post.clone(), &caption).await.ok()?;
 			write_md5(&booru.name, &hash).await;
 		}
 
 		post_ids.push(booru_post.id);
+		std::thread::sleep(Duration::from_secs(5));
 	}
 	let max_id = post_ids.iter().fold(0, |acc, id| acc.max(*id));
 	write_lastid(
@@ -164,6 +159,7 @@ async fn send_posts_in_chat(
 		max_id,
 	)
 	.await;
+	None
 }
 
 async fn send_posts_in_booru(client: &Client, booru: &Booru) {
@@ -207,7 +203,8 @@ async fn main() {
 	let user: User = serde_yaml::from_reader(std::fs::File::open("alma.yaml").unwrap()).unwrap();
 	let user_id = UserId::parse(&user.name).unwrap();
 	let client = Client::builder()
-		.sqlite_store("alma_sqlite_store", None)
+		.handle_refresh_tokens()
+		.sqlite_store("alma_feed_sqlite_store", None)
 		.server_name(user_id.server_name())
 		.build()
 		.await
@@ -218,7 +215,7 @@ async fn main() {
 		.matrix_auth()
 		.login_username(&user_id, &user.password);
 
-	let alma_device_id_file_str = "alma_device_id";
+	let alma_device_id_file_str = "alma_feed_device_id";
 	if let Ok(mut f) = File::open(alma_device_id_file_str).await {
 		let mut device_id_str = String::new();
 		f.read_to_string(&mut device_id_str).await.unwrap();
@@ -233,10 +230,14 @@ async fn main() {
 		let mut f = File::create(alma_device_id_file_str).await.unwrap();
 		f.write_all(response.device_id.as_bytes()).await.unwrap();
 	}
-	client.sync_once(SyncSettings::default()).await.unwrap();
-
+	let sync_settings = SyncSettings::default()
+		.timeout(Duration::from_millis(2000));
 	loop {
+		let sync = client.sync_once(sync_settings.clone()).await;
+		if sync.is_err() {
+			eprintln!("{:?}", sync);
+			continue;
+		};
 		send_posts(&client).await;
-		sleep(Duration::new(30, 0));
 	}
 }
