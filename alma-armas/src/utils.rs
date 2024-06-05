@@ -99,8 +99,8 @@ pub async fn get_booru_posts(url: &str) -> Result<Option<Vec<BooruPost>>, Box<dy
 
 pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) -> anyhow::Result<()> {
 	let file_url = url::Url::parse(&booru_post.file_url)?;
-	let extension = Path::new(file_url.path()).extension().context("ext");
-	let extension_str = extension.context("")?.to_str().context("ext")?;
+	let extension = Path::new(file_url.path()).extension().context("ext")?;
+	let extension_str = extension.to_str().context("ext")?;
 	let content_type = match extension_str {
 		"jpg" | "jpeg" => "image/jpeg".parse::<Mime>()?,
 		"png" => "image/png".parse::<Mime>()?,
