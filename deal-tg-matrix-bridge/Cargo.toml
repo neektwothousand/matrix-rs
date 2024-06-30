@@ -1,0 +1,13 @@
+[package]
+name = "deal-tg-matrix-bridge"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+teloxide = "0.12.2"
+serde_yaml = "0.9.34"
+
+matrix-sdk.workspace = true
+tokio.workspace = true
+serde.workspace = true
