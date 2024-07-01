@@ -9,3 +9,4 @@ murmur.log
 /.cargo/
 rust-toolchain.toml
 Cross.toml
+tg_token
