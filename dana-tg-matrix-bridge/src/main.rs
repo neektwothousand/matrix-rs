@@ -51,11 +51,11 @@ async fn get_matrix_client() -> matrix_sdk::Client {
 		name: String,
 		password: String,
 	}
-	let user: User = serde_yaml::from_reader(std::fs::File::open("deal.yaml").unwrap()).unwrap();
+	let user: User = serde_yaml::from_reader(std::fs::File::open("dana.yaml").unwrap()).unwrap();
 
 	let u = <&ruma::UserId>::try_from(<String as AsRef<str>>::as_ref(&user.name)).unwrap();
 	let client = matrix_sdk::Client::builder()
-		.sqlite_store("deal_sqlite_store", None)
+		.sqlite_store("dana_sqlite_store", None)
 		.server_name(u.server_name())
 		.build()
 		.await
@@ -64,7 +64,7 @@ async fn get_matrix_client() -> matrix_sdk::Client {
 	// First we need to log in.
 	let login_builder = client.matrix_auth().login_username(u, &user.password);
 
-	let dana_device_id_file_str = "deal_device_id";
+	let dana_device_id_file_str = "dana_device_id";
 	if let Ok(mut f) = File::open(dana_device_id_file_str).await {
 		let mut device_id_str = String::new();
 		f.read_to_string(&mut device_id_str).await.unwrap();
@@ -123,7 +123,7 @@ async fn main() -> anyhow::Result<()> {
 	loop {
 		let client_sync = matrix_client.sync(SyncSettings::default()).await;
 		let Err(ref _e) = client_sync else {
-			eprintln!("deal http error");
+			eprintln!("dana http error");
 			continue;
 		};
 	}
