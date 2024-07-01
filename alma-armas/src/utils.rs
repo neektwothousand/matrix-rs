@@ -97,7 +97,11 @@ pub async fn get_booru_posts(url: &str) -> Result<Option<Vec<BooruPost>>, Box<dy
 	}
 }
 
-pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) -> anyhow::Result<()> {
+pub async fn send_feed_post(
+	room: &Room,
+	booru_post: BooruPost,
+	caption: &str,
+) -> anyhow::Result<()> {
 	let file_url = url::Url::parse(&booru_post.file_url)?;
 	let extension = Path::new(file_url.path()).extension().context("ext")?;
 	let extension_str = extension.to_str().context("ext")?;
@@ -110,14 +114,19 @@ pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) -
 	let client = room.client();
 	let event_id = match content_type.essence_str() {
 		"image/jpeg" | "image/png" => {
-			let body = file_url.path_segments().context("cannot be a base")?.last().context("")?;
+			let body = file_url
+				.path_segments()
+				.context("cannot be a base")?
+				.last()
+				.context("")?;
 
 			let request = reqwest::get(file_url.clone()).await?;
 			let data = request.bytes().await?;
 			let mxc_url = client
 				.media()
 				.upload(&content_type, data.to_vec())
-				.await.context("can't upload")?
+				.await
+				.context("can't upload")?
 				.content_uri;
 
 			let image_message = ImageMessageEventContent::plain(body.to_string(), mxc_url);
@@ -148,10 +157,7 @@ pub async fn send_feed_post(room: &Room, booru_post: BooruPost, caption: &str) -
 			Err(_) => continue,
 		}
 	};
-	let original_message = timeline_event
-		.event
-		.deserialize_as::<RoomMessageEvent>()
-		?;
+	let original_message = timeline_event.event.deserialize_as::<RoomMessageEvent>()?;
 	let forward_thread = ForwardThread::No;
 	let add_mentions = AddMentions::No;
 	let text_content = RoomMessageEventContent::text_plain(caption).make_reply_to(

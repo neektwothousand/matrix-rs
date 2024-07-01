@@ -9,7 +9,8 @@ use matrix_sdk::{
 };
 use serde::Deserialize;
 use std::{
-	io::{BufRead, Write}, time::Duration
+	io::{BufRead, Write},
+	time::Duration,
 };
 use tokio::{
 	fs::File,
@@ -96,7 +97,7 @@ async fn send_posts_in_chat(
 		booru.website, "index.php?page=dapi&s=post&q=index&json=1", chat_req
 	);
 
-	let request = get_booru_posts(&url).await.ok()?; 
+	let request = get_booru_posts(&url).await.ok()?;
 	let booru_posts = request?;
 	let mut post_ids: Vec<u64> = vec![];
 	for booru_post in booru_posts {
@@ -235,8 +236,7 @@ async fn main() {
 		let mut f = File::create(alma_device_id_file_str).await.unwrap();
 		f.write_all(response.device_id.as_bytes()).await.unwrap();
 	}
-	let sync_settings = SyncSettings::default()
-		.timeout(Duration::from_millis(2000));
+	let sync_settings = SyncSettings::default().timeout(Duration::from_millis(2000));
 	loop {
 		let sync = client.sync_once(sync_settings.clone()).await;
 		if sync.is_err() {

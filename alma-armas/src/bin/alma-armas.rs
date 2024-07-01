@@ -436,8 +436,7 @@ async fn main() {
 
 	client.add_event_handler(handle_message_event);
 	client.add_event_handler(handle_reaction_event);
-	let sync_settings = SyncSettings::default()
-		.timeout(Duration::from_millis(100));
+	let sync_settings = SyncSettings::default().timeout(Duration::from_millis(100));
 	loop {
 		let sync = client.sync(sync_settings.clone()).await;
 		if sync.is_err() {
