@@ -3,17 +3,17 @@ resolver = "2"
 members = [
 	"alma-armas",
 	"dana-zane",
+	"dana-tg-matrix-bridge",
 	"deal-lilim",
 	"deal-lilim-base-sdk",
-	"deal-tg-matrix-bridge",
 ]
 
 [workspace.dependencies]
 alma-armas = { path = "alma-armas" }
 dana-zane = { path = "dana-zane" }
+dana-tg-matrix-bridge = { path = "dana-tg-matrix-bridge" }
 deal-lilim = { path = "deal-lilim" }
 deal-lilim-base-sdk = { path = "deal-lilim-base-sdk" }
-deal-tg-matrix-bridge = { path = "deal-tg-matrix-bridge" }
 matrix-sdk = { version = "0.7.1", default-features = false, features = ["rustls-tls", "anyhow", "e2e-encryption", "sqlite"] }
 reqwest = { version = "0.11.27", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1.37.0", default-features = false, features = ["rt", "rt-multi-thread"] }
