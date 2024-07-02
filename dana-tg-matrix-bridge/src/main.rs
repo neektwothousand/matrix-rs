@@ -108,7 +108,15 @@ async fn main() -> anyhow::Result<()> {
 			let Some(user) = msg.from() else {
 				anyhow::bail!("");
 			};
-			let text = format!("{}: {text}", user.first_name);
+			let text = if let Some(reply) = msg.reply_to_message() {
+				if let Some(reply_text) = reply.text() {
+					format!("{}\n{}: {text}", reply_text, user.first_name)
+				} else {
+					anyhow::bail!("");
+				}
+			} else {
+				format!("{}: {text}", user.first_name)
+			};
 			tg_msg_handler(&text).await;
 			anyhow::Ok(())
 	}));
