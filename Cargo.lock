@@ -568,6 +568,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "dana-tg-matrix-bridge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "matrix-sdk",
+ "serde",
+ "serde_yaml",
+ "teloxide",
+ "tokio",
+]
+
+[[package]]
 name = "dana-zane"
 version = "0.1.0"
 dependencies = [
@@ -679,18 +691,6 @@ dependencies = [
  "ruma-client",
  "serde",
  "serde_yaml",
- "tokio",
-]
-
-[[package]]
-name = "deal-tg-matrix-bridge"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "matrix-sdk",
- "serde",
- "serde_yaml",
- "teloxide",
  "tokio",
 ]
 
