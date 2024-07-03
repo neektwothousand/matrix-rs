@@ -1,4 +1,4 @@
-use dana_zane::{
+use dana_zane_no_sdk::{
 	types::{
 		login::{Identifier, LoginRequest},
 		room_events::{RequestKeyInfo, RoomKeyRequest, ToDeviceEvent},
@@ -6,7 +6,7 @@ use dana_zane::{
 	},
 	utils::{api::Api, megolm::get_megolm_session},
 };
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
 	collections::HashMap,
 	fs::{read_to_string, File},
@@ -52,7 +52,7 @@ fn get_room_key_request(api: &Api, user: &User, room_id: &str) {
 	messages_map
 		.insert(user.full_name.clone(), device_map)
 		.unwrap();
-	use dana_zane::types::room_events::SendToDeviceRequest;
+	use dana_zane_no_sdk::types::room_events::SendToDeviceRequest;
 	let send_to_device_request = SendToDeviceRequest {
 		messages: messages_map,
 	};
@@ -78,7 +78,7 @@ pub struct EventType {
 }
 
 impl Default for EventType {
-	fn default() - Self {
+	fn default() -> Self {
 		EventType {
 			room_key: "m.room.key".to_string(),
 			room_key_request: "m.room.key_request".to_string(),
@@ -94,11 +94,17 @@ fn try_decrypt(
 	room_id: &str,
 	event: &ClientEventWithoutRoomId,
 ) -> Option<()> {
-	let evemt_type = event.content.get("type").unwrap()
-		.to_string();
-	let evnt_type = match evemt_type.to_string() {
-		EventType{ room_key } => room_key,
-		EventType{ room_key_request } => room_key_request,
+	let event_type = event.content.get("type").unwrap();
+	#[derive(Serialize)]
+	struct EvType {
+		room_key: String,
+		room_key_request: String,
+	}
+	impl DeserializeOwned for EvType {}
+	let event_type: EvType = serde_json::from_value(*event_type).unwrap();
+	let evnt_type = match event_type {
+		EvType{ room_key, .. } => room_key,
+		EvType{ room_key_request, .. } => room_key_request,
 	};
 	
 	let Some(alg) = event.content.get("algorithm") else {
