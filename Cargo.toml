@@ -3,6 +3,7 @@ resolver = "2"
 members = [
 	"alma-armas",
 	"dana-zane",
+	"dana-zane-no-sdk",
 	"deal-lilim",
 	"deal-lilim-base-sdk",
 	"anna-tg-matrix-bridge",
@@ -11,6 +12,7 @@ members = [
 [workspace.dependencies]
 alma-armas = { path = "alma-armas" }
 dana-zane = { path = "dana-zane" }
+dana-zane-no-sdk = { path = "dana-zane" }
 deal-lilim = { path = "deal-lilim" }
 deal-lilim-base-sdk = { path = "deal-lilim-base-sdk" }
 anna-tg-matrix-bridge = { path = "anna-tg-matrix-bridge" }

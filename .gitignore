@@ -10,3 +10,5 @@ murmur.log
 rust-toolchain.toml
 Cross.toml
 tg_token
+/dana-zane-no-sdk/since
+/dana-zane-no-sdk/.env

@@ -1,0 +1,14 @@
+[package]
+name = "dana-zane"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8.5"
+ron = "0.8.1"
+serde = { version = "1.0.180", features = ["derive"] }
+serde_json = "1.0.104"
+ureq = { version = "2.7.1", default-features = false, features = ["tls"] }
+vodozemac = "0.5.0"
