@@ -11,24 +11,13 @@ use ruma::events::{
 
 use serde::{Deserialize, Serialize};
 use teloxide::dispatching::{Dispatcher, UpdateFilterExt};
-use teloxide::requests::Requester;
-use teloxide::Bot;
 
-use anna_tg_matrix_bridge::utils::{get_tg_bot, tg_photo_handler, tg_text_handler};
 use tokio::{
 	fs::File,
 	io::{AsyncReadExt, AsyncWriteExt},
 };
 
-const TG_CHAT_ID: i64 = -1001402125530;
-
-async fn matrix_text_tg(text: String, bot: &Bot) {
-	let chat_id = teloxide::types::ChatId(TG_CHAT_ID);
-	match bot.send_message(chat_id, text).await {
-		Ok(_) => (),
-		Err(e) => eprintln!("{:?}", e),
-	};
-}
+use anna_tg_matrix_bridge::utils::{get_tg_bot, tg_photo_handler, tg_text_handler, matrix_text_tg};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -40,14 +29,15 @@ async fn main() -> anyhow::Result<()> {
 	let user: User = serde_yaml::from_reader(std::fs::File::open("anna.yaml").unwrap()).unwrap();
 
 	let u = matrix_sdk::ruma::UserId::parse(&user.name).unwrap();
-	let matrix_client = matrix_sdk::Client::builder()
+	let client = matrix_sdk::Client::builder()
 		.sqlite_store("anna_sqlite_store", None)
 		.server_name(u.server_name())
 		.build()
 		.await
 		.unwrap();
-
-	// First we need to log in.
+	let bot = Arc::new(get_tg_bot().await);
+	let bot_to_matrix = Arc::clone(&bot);
+	let matrix_client = client.clone();
 	let login_builder = matrix_client
 		.matrix_auth()
 		.login_username(u, &user.password);
@@ -67,11 +57,8 @@ async fn main() -> anyhow::Result<()> {
 		let mut f = File::create(dana_device_id_file_str).await.unwrap();
 		f.write_all(response.device_id.as_bytes()).await.unwrap();
 	}
-
-	let matrix_client_id = matrix_client.user_id().unwrap().to_string();
-	let bot = Arc::new(get_tg_bot().await);
-	let bot_to_matrix = Arc::clone(&bot);
-	matrix_client.add_event_handler(
+	let matrix_client_id = client.user_id().unwrap().to_string();
+	client.add_event_handler(
 		|ev: SyncRoomMessageEvent, room: matrix_sdk::Room, _: Client| async move {
 			if ev.sender().as_str() == matrix_client_id {
 				return;
@@ -99,23 +86,29 @@ async fn main() -> anyhow::Result<()> {
 			}
 		},
 	);
-
-	std::thread::spawn(|| async {
+	tokio::spawn(async move {
 		let tg_update_handler = teloxide::types::Update::filter_message()
-			.branch(teloxide::dptree::endpoint(tg_text_handler))
-			.branch(teloxide::dptree::endpoint(tg_photo_handler));
+			.branch(
+				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.text().is_some())
+				.endpoint(tg_text_handler))
+			.branch(
+				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.photo().is_some())
+				.endpoint(tg_photo_handler)
+			);
 		Dispatcher::builder(bot, tg_update_handler)
+			.dependencies(teloxide::dptree::deps![client])
 			.build()
 			.dispatch()
 			.await;
 	});
-
-	println!("bridge started");
-
+	if matrix_client.user_id().is_some() {
+		println!("matrix client logged in");
+	}
+	println!("tg dispatched");
 	loop {
 		let client_sync = matrix_client.sync(SyncSettings::default()).await;
 		if let Err(ref e) = client_sync {
-			eprintln!("{:#?}", e);
+			eprintln!("{:?}", e);
 		}
 	}
 }
