@@ -67,7 +67,8 @@ async fn main() -> anyhow::Result<()> {
 				match &original_message.content.msgtype {
 					MessageType::Text(text) => {
 						let text = format!("{}: {}", ev.sender().as_str(), text.body);
-						matrix_text_tg(text, &bot_to_matrix).await;
+						let preview = true;
+						matrix_text_tg(text, &bot_to_matrix, preview).await;
 					}
 					MessageType::Image(_)
 					| MessageType::File(_)
@@ -79,7 +80,8 @@ async fn main() -> anyhow::Result<()> {
 							.unwrap()
 							.to_string();
 						let image = format!("{}: (file)\n{}", ev.sender().as_str(), url);
-						matrix_text_tg(image, &bot_to_matrix).await;
+						let preview = false;
+						matrix_text_tg(image, &bot_to_matrix, preview).await;
 					}
 					_ => (),
 				}

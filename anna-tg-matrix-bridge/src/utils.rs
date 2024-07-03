@@ -74,9 +74,9 @@ pub async fn tg_photo_handler(
 	anyhow::Ok(())
 }
 
-pub async fn matrix_text_tg(text: String, bot: &Bot) {
+pub async fn matrix_text_tg(text: String, bot: &Bot, preview: bool) {
 	let chat_id = teloxide::types::ChatId(TG_CHAT_ID);
-	match bot.send_message(chat_id, text).disable_web_page_preview(true).await {
+	match bot.send_message(chat_id, text).disable_web_page_preview(preview).await {
 		Ok(_) => (),
 		Err(e) => eprintln!("{:?}", e),
 	};
