@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 
 use matrix_sdk::{
 	ruma::{
@@ -81,8 +81,9 @@ pub async fn tg_photo_handler(
 	bot.download_file(&photo_path, &mut photo_dst)
 		.await
 		.unwrap();
-	tg_photo_matrix(photo_file_path, msg.caption(), matrix_client).await;
-	anyhow::Ok(())
+	let sender = format!("from {}:", user.first_name.clone());
+	tg_photo_matrix(photo_file_path, sender, msg.caption(), matrix_client).await?;
+	Ok(())
 }
 
 pub async fn matrix_text_tg(text: String, bot: &Bot, preview: bool) {
@@ -120,18 +121,18 @@ async fn tg_text_matrix(text: &str, matrix_client: matrix_sdk::Client) {
 
 async fn tg_photo_matrix(
 	photo_file_path: String,
+	sender: String,
 	caption: Option<&str>,
 	matrix_client: matrix_sdk::Client,
-) {
+) -> anyhow::Result<()> {
 	let matrix_room = matrix_client
-		.get_room(&RoomId::parse(MATRIX_CHAT_ID).unwrap())
-		.unwrap();
-	let extension_str = std::path::Path::new(&photo_file_path).extension().unwrap();
+		.get_room(&RoomId::parse(MATRIX_CHAT_ID)?).context("")?;
+	let extension_str = std::path::Path::new(&photo_file_path).extension().context("")?;
 	let content_type = match extension_str.to_str().unwrap() {
 		"jpg" | "jpeg" => "image/jpeg".parse::<mime::Mime>().unwrap(),
-		_ => return,
+		_ => bail!(""),
 	};
-	let photo = std::fs::read(photo_file_path).unwrap();
+	let photo = std::fs::read(photo_file_path)?;
 	let mxc_uri = matrix_client
 		.media()
 		.upload(&content_type, photo)
@@ -142,11 +143,15 @@ async fn tg_photo_matrix(
 		"tg_photo".to_string(),
 		matrix_sdk::ruma::events::room::MediaSource::Plain(mxc_uri),
 	);
+	let message = RoomMessageEventContent::text_plain(sender);
+	matrix_room.send(message).await?;
 	let message = RoomMessageEventContent::new(MessageType::Image(image_message));
-	matrix_room.send(message).await.unwrap();
+	matrix_room.send(message).await?;
 
 	if let Some(caption) = caption {
 		let message = RoomMessageEventContent::text_plain(caption);
-		matrix_room.send(message).await.unwrap();
+		matrix_room.send(message).await?;
 	}
+
+	Ok(())
 }
