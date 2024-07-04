@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anna_tg_matrix_bridge::utils::matrix_file_tg;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::ruma;
 use matrix_sdk::Client;
@@ -17,7 +18,7 @@ use tokio::{
 	io::{AsyncReadExt, AsyncWriteExt},
 };
 
-use anna_tg_matrix_bridge::utils::{get_tg_bot, tg_photo_handler, tg_text_handler, matrix_text_tg};
+use anna_tg_matrix_bridge::utils::{get_tg_bot, matrix_text_tg, tg_photo_handler, tg_text_handler};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -59,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
 	}
 	let matrix_client_id = client.user_id().unwrap().to_string();
 	client.add_event_handler(
-		|ev: SyncRoomMessageEvent, room: matrix_sdk::Room, _: Client| async move {
+		|ev: SyncRoomMessageEvent, _: matrix_sdk::Room, client: Client| async move {
 			if ev.sender().as_str() == matrix_client_id {
 				return;
 			}
@@ -67,21 +68,17 @@ async fn main() -> anyhow::Result<()> {
 				match &original_message.content.msgtype {
 					MessageType::Text(text) => {
 						let text = format!("{}: {}", ev.sender().as_str(), text.body);
-						let preview = true;
-						matrix_text_tg(text, &bot_to_matrix, preview).await;
+						let disable_preview = false;
+						matrix_text_tg(text, &bot_to_matrix, disable_preview).await;
 					}
-					MessageType::Image(_)
-					| MessageType::File(_)
-					| MessageType::Audio(_)
-					| MessageType::Video(_) => {
-						let url = room
-							.matrix_to_event_permalink(ev.event_id())
-							.await
-							.unwrap()
-							.to_string();
-						let image = format!("{}: (file)\n{}", ev.sender().as_str(), url);
-						let preview = false;
-						matrix_text_tg(image, &bot_to_matrix, preview).await;
+					MessageType::Image(i) => {
+						let media = client.media();
+						let Ok(Some(media)) = media.get_file(i.clone(), true).await else {
+							return;
+						};
+						let media_name = i.body.clone();
+						let caption = ev.sender().as_str();
+						matrix_file_tg(media, media_name, caption, &bot_to_matrix).await;
 					}
 					_ => (),
 				}
@@ -92,10 +89,11 @@ async fn main() -> anyhow::Result<()> {
 		let tg_update_handler = teloxide::types::Update::filter_message()
 			.branch(
 				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.text().is_some())
-				.endpoint(tg_text_handler))
+					.endpoint(tg_text_handler),
+			)
 			.branch(
 				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.photo().is_some())
-				.endpoint(tg_photo_handler)
+					.endpoint(tg_photo_handler),
 			);
 		Dispatcher::builder(bot, tg_update_handler)
 			.dependencies(teloxide::dptree::deps![client])

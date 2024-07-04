@@ -11,7 +11,11 @@ use matrix_sdk::{
 };
 
 use teloxide::{
-	net::Download, payloads::SendMessageSetters, requests::Requester, types::Message, Bot
+	net::Download,
+	payloads::{SendDocumentSetters, SendMessageSetters},
+	requests::Requester,
+	types::{InputFile, Message},
+	Bot,
 };
 
 const MATRIX_CHAT_ID: &str = "!vUWLFTSVVBjhMouZpF:matrix.org";
@@ -25,7 +29,7 @@ pub async fn get_tg_bot() -> teloxide::Bot {
 pub async fn tg_text_handler(
 	msg: Message,
 	bot: Arc<Bot>,
-	matrix_client: Client
+	matrix_client: Client,
 ) -> anyhow::Result<()> {
 	let Some(user) = msg.from() else {
 		bail!("");
@@ -40,10 +44,17 @@ pub async fn tg_text_handler(
 			let photo = photo.last().unwrap();
 			let file_id = &photo.file.id;
 			let file = bot.get_file(file_id).await.unwrap();
-			let url = format!("https://api.telegram.org/file/bot{}/{}", bot.token(), file.path);
+			let url = format!(
+				"https://api.telegram.org/file/bot{}/{}",
+				bot.token(),
+				file.path
+			);
 			format!("{url}\n{}:{text}", user.first_name)
 		} else {
-			format!("https://t.me/c/{}/{}\n{}:{text}", reply.chat.id, reply.id, user.first_name)
+			format!(
+				"https://t.me/c/{}/{}\n{}:{text}",
+				reply.chat.id, reply.id, user.first_name
+			)
 		}
 	} else {
 		format!("{}: {text}", user.first_name)
@@ -76,10 +87,26 @@ pub async fn tg_photo_handler(
 
 pub async fn matrix_text_tg(text: String, bot: &Bot, preview: bool) {
 	let chat_id = teloxide::types::ChatId(TG_CHAT_ID);
-	match bot.send_message(chat_id, text).disable_web_page_preview(preview).await {
+	match bot
+		.send_message(chat_id, text)
+		.disable_web_page_preview(preview)
+		.await
+	{
 		Ok(_) => (),
 		Err(e) => eprintln!("{:?}", e),
 	};
+}
+
+pub async fn matrix_file_tg(file: Vec<u8>, file_name: String, caption: &str, bot: &Bot) {
+	let chat_id = teloxide::types::ChatId(TG_CHAT_ID);
+	match bot
+		.send_document(chat_id, InputFile::memory(file).file_name(file_name))
+		.caption(caption)
+		.await
+	{
+		Ok(_) => (),
+		Err(e) => eprintln!("{:?}", e),
+	}
 }
 
 async fn tg_text_matrix(text: &str, matrix_client: matrix_sdk::Client) {
