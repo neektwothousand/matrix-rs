@@ -81,7 +81,7 @@ pub async fn tg_text_handler(
 	};
 	let text = if let Some(reply) = msg.reply_to_message() {
 		if let Some(reply_text) = reply.text() {
-			format!("{}\n{}: {text}", reply_text, user.first_name)
+			format!("> {}\n{}: {text}", reply_text, user.first_name)
 		} else if let Some(photo) = reply.photo() {
 			let photo = photo.last().unwrap();
 			let file_id = &photo.file.id;
@@ -89,13 +89,25 @@ pub async fn tg_text_handler(
 			let url = format!(
 				"https://api.telegram.org/file/bot{}/{}",
 				bot.token(),
-				file.path
+				file.path.trim(),
 			);
-			format!("{url}\n{}:{text}", user.first_name)
+			format!("> {url}\n{}: {text}", user.first_name)
+		} else if let Some(file) = reply.document() {
+			let file_id = &file.file.id;
+			let file = bot.get_file(file_id).await.unwrap();
+			let url = format!(
+				"https://api.telegram.org/file/bot{}/{}",
+				bot.token(),
+				file.path.trim(),
+			);
+			format!("> {url}\n{}: {text}", user.first_name)
 		} else {
+			let mut chat_link = reply.chat.id.to_string();
 			format!(
 				"https://t.me/c/{}/{}\n{}:{text}",
-				reply.chat.id, reply.id, user.first_name
+				chat_link.drain(4..).as_str(),
+				reply.id,
+				user.first_name
 			)
 		}
 	} else {
@@ -156,7 +168,6 @@ async fn tg_text_matrix(text: &str, matrix_client: matrix_sdk::Client) {
 	let matrix_room = matrix_client
 		.get_room(&RoomId::parse(MATRIX_CHAT_ID).unwrap())
 		.unwrap();
-	let text = format!("telegram:\n{}", text);
 	let message = RoomMessageEventContent::text_plain(text);
 	matrix_room.send(message).await.unwrap();
 }
