@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::{bail, Context};
 
 use matrix_sdk::{
+	media::MediaEventContent,
 	ruma::{
 		events::room::message::{ImageMessageEventContent, MessageType, RoomMessageEventContent},
 		RoomId,
@@ -20,6 +21,47 @@ use teloxide::{
 
 const MATRIX_CHAT_ID: &str = "!vUWLFTSVVBjhMouZpF:matrix.org";
 const TG_CHAT_ID: i64 = -1001402125530;
+
+pub type MatrixMedia = (String, Vec<u8>);
+
+pub trait GetMatrixMedia {
+	fn get_media(
+		client: Client,
+		media: MessageType,
+	) -> impl std::future::Future<Output = anyhow::Result<MatrixMedia>> + Send;
+}
+
+impl GetMatrixMedia for MatrixMedia {
+	async fn get_media(client: Client, media: MessageType) -> anyhow::Result<MatrixMedia> {
+		match media {
+			MessageType::File(m) => {
+				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
+					bail!("");
+				};
+				Ok((m.body, media))
+			}
+			MessageType::Image(m) => {
+				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
+					bail!("");
+				};
+				Ok((m.body, media))
+			}
+			MessageType::Audio(m) => {
+				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
+					bail!("");
+				};
+				Ok((m.body, media))
+			}
+			MessageType::Video(m) => {
+				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
+					bail!("");
+				};
+				Ok((m.body, media))
+			}
+			_ => bail!(""),
+		}
+	}
+}
 
 pub async fn get_tg_bot() -> teloxide::Bot {
 	let token = std::fs::read_to_string("tg_token").unwrap();

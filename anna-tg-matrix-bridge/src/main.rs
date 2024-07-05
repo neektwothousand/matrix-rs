@@ -18,7 +18,9 @@ use tokio::{
 	io::{AsyncReadExt, AsyncWriteExt},
 };
 
-use anna_tg_matrix_bridge::utils::{get_tg_bot, matrix_text_tg, tg_photo_handler, tg_text_handler};
+use anna_tg_matrix_bridge::utils::{
+	get_tg_bot, matrix_text_tg, tg_photo_handler, tg_text_handler, GetMatrixMedia,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -65,22 +67,20 @@ async fn main() -> anyhow::Result<()> {
 				return;
 			}
 			if let SyncMessageLikeEvent::Original(original_message) = ev.clone() {
-				match &original_message.content.msgtype {
-					MessageType::Text(text) => {
-						let text = format!("{}: {}", ev.sender().as_str(), text.body);
-						let disable_preview = false;
-						matrix_text_tg(text, &bot_to_matrix, disable_preview).await;
-					}
-					MessageType::Image(i) => {
-						let media = client.media();
-						let Ok(Some(media)) = media.get_file(i.clone(), true).await else {
-							return;
-						};
-						let media_name = i.body.clone();
-						let caption = ev.sender().as_str();
-						matrix_file_tg(media, media_name, caption, &bot_to_matrix).await;
-					}
-					_ => (),
+				let message_type = &original_message.content.msgtype;
+				if let MessageType::Text(text) = message_type {
+					let text = format!("{}: {}", ev.sender().as_str(), text.body);
+					let disable_preview = false;
+					matrix_text_tg(text, &bot_to_matrix, disable_preview).await;
+				} else if let Ok(media) = <(String, Vec<u8>) as GetMatrixMedia>::get_media(
+					client.clone(),
+					message_type.clone(),
+				)
+				.await
+				{
+					let (media, media_name) = media;
+					let caption = ev.sender().as_str();
+					matrix_file_tg(media_name, media, caption, &bot_to_matrix).await;
 				}
 			}
 		},
