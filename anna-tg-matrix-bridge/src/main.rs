@@ -19,8 +19,9 @@ use tokio::{
 };
 
 use anna_tg_matrix_bridge::utils::{
-	get_tg_bot, matrix_text_tg, tg_photo_handler, tg_text_handler, GetMatrixMedia,
+	get_tg_bot, matrix_text_tg, tg_photo_handler, tg_text_handler, get_matrix_media,
 };
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -72,12 +73,7 @@ async fn main() -> anyhow::Result<()> {
 					let text = format!("{}: {}", ev.sender().as_str(), text.body);
 					let disable_preview = false;
 					matrix_text_tg(text, &bot_to_matrix, disable_preview).await;
-				} else if let Ok(media) = <(String, Vec<u8>) as GetMatrixMedia>::get_media(
-					client.clone(),
-					message_type.clone(),
-				)
-				.await
-				{
+				} else if let Ok(media) = get_matrix_media(client, message_type.clone()).await {
 					let (media, media_name) = media;
 					let caption = ev.sender().as_str();
 					matrix_file_tg(media_name, media, caption, &bot_to_matrix).await;
