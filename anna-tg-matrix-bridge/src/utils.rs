@@ -62,10 +62,14 @@ impl GetMatrixMedia for MatrixMedia {
 	}
 }
 
-pub async fn get_matrix_media(client: Client, message_type: MessageType) -> anyhow::Result<(String, Vec<u8>)> {
-	let Ok(media) = <(String, Vec<u8>) as GetMatrixMedia>::get_media(
-		client.clone(),
-		message_type.clone()).await else {
+pub async fn get_matrix_media(
+	client: Client,
+	message_type: MessageType,
+) -> anyhow::Result<(String, Vec<u8>)> {
+	let Ok(media) =
+		<(String, Vec<u8>) as GetMatrixMedia>::get_media(client.clone(), message_type.clone())
+			.await
+	else {
 		bail!("");
 	};
 	Ok(media)
