@@ -179,8 +179,11 @@ async fn tg_photo_matrix(
 	matrix_client: matrix_sdk::Client,
 ) -> anyhow::Result<()> {
 	let matrix_room = matrix_client
-		.get_room(&RoomId::parse(MATRIX_CHAT_ID)?).context("")?;
-	let extension_str = std::path::Path::new(&photo_file_path).extension().context("")?;
+		.get_room(&RoomId::parse(MATRIX_CHAT_ID)?)
+		.context("")?;
+	let extension_str = std::path::Path::new(&photo_file_path)
+		.extension()
+		.context("")?;
 	let content_type = match extension_str.to_str().unwrap() {
 		"jpg" | "jpeg" => "image/jpeg".parse::<mime::Mime>().unwrap(),
 		_ => bail!(""),
