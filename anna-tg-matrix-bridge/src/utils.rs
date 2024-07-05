@@ -103,7 +103,12 @@ pub async fn tg_text_handler(
 				bot.token(),
 				file.path.trim(),
 			);
-			format!("> {url}\n{}: {text}", user.first_name)
+			if reply.via_bot.is_none() {
+				let reply_username = &reply.from().context("")?.first_name;
+				format!("> {reply_username} {url}\n{}: {text}", user.first_name)
+			} else {
+				format!("> {url}\n{}: {text}", user.first_name)
+			}
 		} else if let Some(file) = reply.document() {
 			let file_id = &file.file.id;
 			let file = bot.get_file(file_id).await.unwrap();
@@ -112,7 +117,12 @@ pub async fn tg_text_handler(
 				bot.token(),
 				file.path.trim(),
 			);
-			format!("> {url}\n{}: {text}", user.first_name)
+			if reply.via_bot.is_none() {
+				let reply_username = &reply.from().context("")?.first_name;
+				format!("> {reply_username} {url}\n{}: {text}", user.first_name)
+			} else {
+				format!("> {url}\n{}: {text}", user.first_name)
+			}
 		} else {
 			let mut chat_link = reply.chat.id.to_string();
 			format!(
