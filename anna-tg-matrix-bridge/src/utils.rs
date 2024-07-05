@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::{bail, Context};
 
 use matrix_sdk::{
-	media::MediaEventContent,
 	ruma::{
 		events::room::message::{ImageMessageEventContent, MessageType, RoomMessageEventContent},
 		RoomId,
