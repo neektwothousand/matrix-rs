@@ -25,7 +25,7 @@ struct User {
 	room_id: String,
 }
 
-async fn delete_message(room: &Room, res: send_message_event::v3::Response) {
+async fn delete_message(room: Room, res: send_message_event::v3::Response) {
 	let event_id = res.event_id;
 	sleep(Duration::from_secs(86400)).await;
 	let res = room.redact(&event_id, None, None).await;
@@ -41,7 +41,7 @@ fn read_stream(mut stream: UnixStream) -> String {
 	String::from_utf8_lossy(buf.as_slice()).to_string()
 }
 
-async fn read_sock(room: &'static Room, socket: &str) {
+async fn read_sock(room: Room, socket: &str) {
 	let unix_listener = UnixListener::bind(socket).unwrap();
 	for stream in unix_listener.incoming() {
 		let sock_message = match stream {
@@ -51,6 +51,7 @@ async fn read_sock(room: &'static Room, socket: &str) {
 				continue;
 			}
 		};
+		let room = room.clone();
 		spawn(async move {
 			println!("{}", &sock_message);
 			let content = RoomMessageEventContent::text_plain(sock_message);
@@ -96,14 +97,16 @@ async fn main() {
 	}
 
 	let room_id = RoomId::parse(&user.room_id).unwrap();
-	let room: &'static Room = Box::leak(Box::new(client.get_room(&room_id).unwrap()));
+
+	client.sync_once(SyncSettings::default()).await.unwrap();
+	let room = client.get_room(&room_id).unwrap();
 	let sockets = [DIS_SOCK, MUR_SOCK];
 
 	for socket in sockets {
 		if Path::new(socket).exists() {
 			fs::remove_file(socket).unwrap();
 		}
-		spawn(read_sock(room, socket));
+		spawn(read_sock(room.clone(), socket));
 	}
 
 	loop {
