@@ -43,8 +43,8 @@ async fn main() -> anyhow::Result<()> {
 		.matrix_auth()
 		.login_username(u, &user.password);
 
-	let dana_device_id_file_str = "anna_device_id";
-	if let Ok(mut f) = File::open(dana_device_id_file_str).await {
+	let anna_device_id_file_str = "anna_device_id";
+	if let Ok(mut f) = File::open(anna_device_id_file_str).await {
 		let mut device_id_str = String::new();
 		f.read_to_string(&mut device_id_str).await.unwrap();
 
@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
 			.unwrap();
 	} else {
 		let response = login_builder.send().await.unwrap();
-		let mut f = File::create(dana_device_id_file_str).await.unwrap();
+		let mut f = File::create(anna_device_id_file_str).await.unwrap();
 		f.write_all(response.device_id.as_bytes()).await.unwrap();
 	}
 	let matrix_client_id = client.user_id().unwrap().to_string();
