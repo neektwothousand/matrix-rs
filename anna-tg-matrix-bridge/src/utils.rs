@@ -101,7 +101,7 @@ pub async fn tg_text_handler(
 			let url = format!(
 				"https://api.telegram.org/file/bot{}/{}",
 				bot.token(),
-				file.path.trim(),
+				file.path,
 			);
 			if reply.via_bot.is_none() {
 				let reply_username = &reply.from().context("")?.first_name;
