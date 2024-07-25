@@ -82,7 +82,7 @@ pub async fn get_tg_bot() -> teloxide::Bot {
 
 pub async fn tg_text_handler(
 	msg: Message,
-	bot: Arc<Bot>,
+	_bot: Arc<Bot>,
 	matrix_client: Client,
 ) -> anyhow::Result<()> {
 	let Some(user) = msg.from() else {
@@ -91,40 +91,11 @@ pub async fn tg_text_handler(
 	let Some(text) = msg.text() else {
 		bail!("");
 	};
-	let text = if let Some(reply) = msg.reply_to_message() {
+	let to_matrix_text = if let Some(reply) = msg.reply_to_message() {
+		let mut chat_link = reply.chat.id.to_string();
 		if let Some(reply_text) = reply.text() {
 			format!("> {}\n{}: {text}", reply_text, user.first_name)
-		} else if let Some(photo) = reply.photo() {
-			let photo = photo.last().unwrap();
-			let file_id = &photo.file.id;
-			let file = bot.get_file(file_id).await.unwrap();
-			let url = format!(
-				"https://api.telegram.org/file/bot{}/{}",
-				bot.token(),
-				file.path,
-			);
-			if reply.via_bot.is_none() {
-				let reply_username = &reply.from().context("")?.first_name;
-				format!("> {reply_username} {url}\n{}: {text}", user.first_name)
-			} else {
-				format!("> {url}\n{}: {text}", user.first_name)
-			}
-		} else if let Some(file) = reply.document() {
-			let file_id = &file.file.id;
-			let file = bot.get_file(file_id).await.unwrap();
-			let url = format!(
-				"https://api.telegram.org/file/bot{}/{}",
-				bot.token(),
-				file.path.trim(),
-			);
-			if reply.via_bot.is_none() {
-				let reply_username = &reply.from().context("")?.first_name;
-				format!("> {reply_username} {url}\n{}: {text}", user.first_name)
-			} else {
-				format!("> {url}\n{}: {text}", user.first_name)
-			}
 		} else {
-			let mut chat_link = reply.chat.id.to_string();
 			format!(
 				"https://t.me/c/{}/{}\n{}:{text}",
 				chat_link.drain(4..).as_str(),
@@ -135,7 +106,7 @@ pub async fn tg_text_handler(
 	} else {
 		format!("{}: {text}", user.first_name)
 	};
-	tg_text_matrix(&text, matrix_client).await;
+	tg_text_matrix(&to_matrix_text, matrix_client).await;
 	anyhow::Ok(())
 }
 
