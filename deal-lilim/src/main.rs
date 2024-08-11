@@ -78,53 +78,62 @@ async fn socket_handler(room: Room) {
 }
 
 async fn anilist_update(room: &Room) {
-	let file_name = "anilist_last_id";
-	let anilist_last_id = {
-		let file = File::options().read(true).open(file_name);
-		if file.is_err() {
-			0u64
-		} else {
-			let mut buf = String::new();
-			file.unwrap().read_to_string(&mut buf).unwrap();
-			buf.parse::<u64>().unwrap()
-		}
-	};
-	let query = r#"
-		{
-			Activity(userId: 5752916, sort: ID_DESC) {
-				... on ListActivity {
-					siteUrl id user { name } status progress media {
-						title { userPreferred }
-					}
+	let user_ids = [5752916, 6832539];
+	for user_id in user_ids {
+		let mut queries = vec![];
+		queries.push(format!(
+			"{{
+				Activity(userId: {user_id}, sort: ID_DESC) {{
+					... on ListActivity {{
+						siteUrl id user {{ name }} status progress media {{
+							title {{ userPreferred }}
+						}}
+					}}
+				}}
+			}}"
+		));
+		for query in queries {
+			let json_request = serde_json::json!({
+				"query": query
+			});
+			let url = "https://graphql.anilist.co/";
+			let reqwest_client = reqwest::Client::builder()
+				.user_agent("deal-lilim").build().unwrap();
+			let request = reqwest_client.post(url).header("Content-Type", "application/json")
+				.json(&json_request)
+				.build().unwrap();
+			let response = reqwest_client.execute(request).await.unwrap();
+			let response_json = response.json::<serde_json::Value>().await.unwrap();
+			let activity = &response_json["data"]["Activity"];
+			let activity_id = activity["id"].as_u64().unwrap();
+			let file_name = format!("anilist_{user_id}_last_id");
+			let anilist_last_id = {
+				let file = File::options().read(true).open(&file_name);
+				if file.is_err() {
+					0u64
+				} else {
+					let mut buf = String::new();
+					file.unwrap().read_to_string(&mut buf).unwrap();
+					buf.parse::<u64>().unwrap()
 				}
+			};
+			if activity_id == anilist_last_id {
+				continue;
+			} else {
+				let mut file = File::options()
+					.write(true).create(true).truncate(true).open(file_name).unwrap();
+				file.write_all(activity_id.to_string().as_bytes()).unwrap();
 			}
-		}"#;
-	let json_request = serde_json::json!({
-		"query": query
-	});
-	let url = "https://graphql.anilist.co/";
-	let reqwest_client = reqwest::Client::builder().user_agent("deal-lilim").build().unwrap();
-	let request = reqwest_client.post(url).header("Content-Type", "application/json")
-		.json(&json_request)
-		.build().unwrap();
-	let response = reqwest_client.execute(request).await.unwrap();
-	let response_json = response.json::<serde_json::Value>().await.unwrap();
-	let activity = &response_json["data"]["Activity"];
-	let activity_id = activity["id"].as_u64().unwrap();
-	if activity_id == anilist_last_id {
-		return;
-	} else {
-		let mut file = File::options()
-			.write(true).create(true).truncate(true).open(file_name).unwrap();
-		file.write_all(activity_id.to_string().as_bytes()).unwrap();
+			let user = &activity["user"]["name"].as_str().unwrap();
+			let activity_link = &activity["siteUrl"].as_str().unwrap();
+			let anime = &activity["media"]["title"]["userPreferred"].as_str().unwrap();
+			let status = &activity["status"].as_str().unwrap();
+			let progress = &activity["progress"].as_str().unwrap_or_default();
+			let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
+			room.send(RoomMessageEventContent::text_plain(result)).await.unwrap();
+			sleep(Duration::from_secs(10)).await;
+		}
 	}
-	let user = &activity["user"]["name"].as_str().unwrap();
-	let activity_link = &activity["siteUrl"].as_str().unwrap();
-	let anime = &activity["media"]["title"]["userPreferred"].as_str().unwrap();
-	let status = &activity["status"].as_str().unwrap();
-	let progress = &activity["progress"].as_str().unwrap();
-	let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
-	room.send(RoomMessageEventContent::text_plain(result)).await.unwrap();
 }
 
 #[tokio::main]
