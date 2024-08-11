@@ -66,6 +66,11 @@ async fn main() -> anyhow::Result<()> {
 			if ev.sender().as_str() == matrix_client_id {
 				return;
 			}
+			if !std::path::Path::new("anna.log").exists() {
+				std::fs::File::create("anna.log").unwrap();
+			}
+			let mut log = std::fs::OpenOptions::new().append(true).open("anna.log").unwrap();
+			log.write_all(format!("{:?}\n", ev.event_id()).as_bytes()).unwrap();
 			if let SyncMessageLikeEvent::Original(original_message) = ev.clone() {
 				let message_type = &original_message.content.msgtype;
 				if let MessageType::Text(text) = message_type {
