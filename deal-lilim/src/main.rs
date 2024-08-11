@@ -66,6 +66,67 @@ async fn read_sock(room: Room, socket: &str) {
 	}
 }
 
+async fn socket_handler(room: Room) {
+	let sockets = [DIS_SOCK, MUR_SOCK];
+
+	for socket in sockets {
+		if Path::new(socket).exists() {
+			fs::remove_file(socket).unwrap();
+		}
+		spawn(read_sock(room.clone(), socket));
+	}
+}
+
+async fn anilist_update(room: &Room) {
+	let file_name = "anilist_last_id";
+	let anilist_last_id = {
+		let file = File::options().read(true).open(file_name);
+		if file.is_err() {
+			0u64
+		} else {
+			let mut buf = String::new();
+			file.unwrap().read_to_string(&mut buf).unwrap();
+			buf.parse::<u64>().unwrap()
+		}
+	};
+	let query = r#"
+		{
+			Activity(userId: 5752916, sort: ID_DESC) {
+				... on ListActivity {
+					siteUrl id user { name } status progress media {
+						title { userPreferred }
+					}
+				}
+			}
+		}"#;
+	let json_request = serde_json::json!({
+		"query": query
+	});
+	let url = "https://graphql.anilist.co/";
+	let reqwest_client = reqwest::Client::builder().user_agent("deal-lilim").build().unwrap();
+	let request = reqwest_client.post(url).header("Content-Type", "application/json")
+		.json(&json_request)
+		.build().unwrap();
+	let response = reqwest_client.execute(request).await.unwrap();
+	let response_json = response.json::<serde_json::Value>().await.unwrap();
+	let activity = &response_json["data"]["Activity"];
+	let activity_id = activity["id"].as_u64().unwrap();
+	if activity_id == anilist_last_id {
+		return;
+	} else {
+		let mut file = File::options()
+			.write(true).create(true).truncate(true).open(file_name).unwrap();
+		file.write_all(activity_id.to_string().as_bytes()).unwrap();
+	}
+	let user = &activity["user"]["name"].as_str().unwrap();
+	let activity_link = &activity["siteUrl"].as_str().unwrap();
+	let anime = &activity["media"]["title"]["userPreferred"].as_str().unwrap();
+	let status = &activity["status"].as_str().unwrap();
+	let progress = &activity["progress"].as_str().unwrap();
+	let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
+	room.send(RoomMessageEventContent::text_plain(result)).await.unwrap();
+}
+
 #[tokio::main]
 async fn main() {
 	let user: User = serde_yaml::from_reader(File::open("deal.yaml").unwrap()).unwrap();
@@ -100,14 +161,14 @@ async fn main() {
 
 	client.sync_once(SyncSettings::default()).await.unwrap();
 	let room = client.get_room(&room_id).unwrap();
-	let sockets = [DIS_SOCK, MUR_SOCK];
-
-	for socket in sockets {
-		if Path::new(socket).exists() {
-			fs::remove_file(socket).unwrap();
+	spawn(socket_handler(room.clone()));
+	spawn(async move {
+		let room = room.clone();
+		loop {
+			anilist_update(&room).await;
+			sleep(Duration::from_secs(300)).await;
 		}
-		spawn(read_sock(room.clone(), socket));
-	}
+	});
 
 	loop {
 		let client_sync = client.sync(SyncSettings::default()).await;
