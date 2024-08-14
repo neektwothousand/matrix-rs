@@ -98,10 +98,15 @@ async fn anilist_update(room: &Room) {
 			});
 			let url = "https://graphql.anilist.co/";
 			let reqwest_client = reqwest::Client::builder()
-				.user_agent("deal-lilim").build().unwrap();
-			let request = reqwest_client.post(url).header("Content-Type", "application/json")
+				.user_agent("deal-lilim")
+				.build()
+				.unwrap();
+			let request = reqwest_client
+				.post(url)
+				.header("Content-Type", "application/json")
 				.json(&json_request)
-				.build().unwrap();
+				.build()
+				.unwrap();
 			let response = match reqwest_client.execute(request).await {
 				Ok(r) => r,
 				Err(e) => {
@@ -127,16 +132,24 @@ async fn anilist_update(room: &Room) {
 				continue;
 			} else {
 				let mut file = File::options()
-					.write(true).create(true).truncate(true).open(file_name).unwrap();
+					.write(true)
+					.create(true)
+					.truncate(true)
+					.open(file_name)
+					.unwrap();
 				file.write_all(activity_id.to_string().as_bytes()).unwrap();
 			}
 			let user = &activity["user"]["name"].as_str().unwrap();
 			let activity_link = &activity["siteUrl"].as_str().unwrap();
-			let anime = &activity["media"]["title"]["userPreferred"].as_str().unwrap();
+			let anime = &activity["media"]["title"]["userPreferred"]
+				.as_str()
+				.unwrap();
 			let status = &activity["status"].as_str().unwrap();
 			let progress = &activity["progress"].as_str().unwrap_or_default();
 			let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
-			room.send(RoomMessageEventContent::text_plain(result)).await.unwrap();
+			room.send(RoomMessageEventContent::text_plain(result))
+				.await
+				.unwrap();
 			sleep(Duration::from_secs(10)).await;
 		}
 	}

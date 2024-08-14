@@ -77,8 +77,12 @@ async fn main() -> anyhow::Result<()> {
 				"!6oZjqONVahFLOKTvut:matrix.archneek.me" => -1002152065322i64,
 				_ => return,
 			};
-			let mut log = std::fs::OpenOptions::new().append(true).open("anna.log").unwrap();
-			log.write_all(format!("{:?}\n", ev.event_id()).as_bytes()).unwrap();
+			let mut log = std::fs::OpenOptions::new()
+				.append(true)
+				.open("anna.log")
+				.unwrap();
+			log.write_all(format!("{:?}\n", ev.event_id()).as_bytes())
+				.unwrap();
 			if let SyncMessageLikeEvent::Original(original_message) = ev.clone() {
 				let message_type = &original_message.content.msgtype;
 				if let MessageType::Text(text) = message_type {

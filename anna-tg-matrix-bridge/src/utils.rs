@@ -11,8 +11,11 @@ use matrix_sdk::{
 };
 
 use teloxide::{
-	net::Download, payloads::{SendDocumentSetters, SendMessageSetters},
-	requests::Requester, types::{InputFile, Message}, Bot
+	net::Download,
+	payloads::{SendDocumentSetters, SendMessageSetters},
+	requests::Requester,
+	types::{InputFile, Message},
+	Bot,
 };
 
 pub type MatrixMedia = (String, Vec<u8>);
@@ -160,7 +163,14 @@ pub async fn tg_photo_handler(
 		-1002152065322i64 => "!6oZjqONVahFLOKTvut:matrix.archneek.me",
 		_ => return Ok(()),
 	};
-	tg_photo_matrix(matrix_chat_id.to_string(), photo_file_path, sender, msg.caption(), matrix_client).await?;
+	tg_photo_matrix(
+		matrix_chat_id.to_string(),
+		photo_file_path,
+		sender,
+		msg.caption(),
+		matrix_client,
+	)
+	.await?;
 	Ok(())
 }
 
@@ -176,7 +186,13 @@ pub async fn matrix_text_tg(tg_chat_id: i64, text: String, bot: &Bot, preview: b
 	};
 }
 
-pub async fn matrix_file_tg(tg_chat_id: i64, file: Vec<u8>, file_name: String, caption: &str, bot: &Bot) {
+pub async fn matrix_file_tg(
+	tg_chat_id: i64,
+	file: Vec<u8>,
+	file_name: String,
+	caption: &str,
+	bot: &Bot,
+) {
 	let chat_id = teloxide::types::ChatId(tg_chat_id);
 	match bot
 		.send_document(chat_id, InputFile::memory(file).file_name(file_name))
