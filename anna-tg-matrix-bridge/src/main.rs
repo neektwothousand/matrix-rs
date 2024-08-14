@@ -63,13 +63,20 @@ async fn main() -> anyhow::Result<()> {
 	}
 	let matrix_client_id = client.user_id().unwrap().to_string();
 	client.add_event_handler(
-		|ev: SyncRoomMessageEvent, _: matrix_sdk::Room, client: Client| async move {
+		|ev: SyncRoomMessageEvent, room: matrix_sdk::Room, client: Client| async move {
 			if ev.sender().as_str() == matrix_client_id {
 				return;
 			}
 			if !std::path::Path::new("anna.log").exists() {
 				std::fs::File::create("anna.log").unwrap();
 			}
+			let tg_chat_id = match room.room_id().as_str() {
+				// The Wired
+				"!vUWLFTSVVBjhMouZpF:matrix.org" => -1001402125530i64,
+				// OTHERWORLD
+				"!6oZjqONVahFLOKTvut:matrix.archneek.me" => -1002152065322i64,
+				_ => return,
+			};
 			let mut log = std::fs::OpenOptions::new().append(true).open("anna.log").unwrap();
 			log.write_all(format!("{:?}\n", ev.event_id()).as_bytes()).unwrap();
 			if let SyncMessageLikeEvent::Original(original_message) = ev.clone() {
@@ -77,11 +84,11 @@ async fn main() -> anyhow::Result<()> {
 				if let MessageType::Text(text) = message_type {
 					let text = format!("{}: {}", ev.sender().as_str(), text.body);
 					let disable_preview = false;
-					matrix_text_tg(text, &bot_to_matrix, disable_preview).await;
+					matrix_text_tg(tg_chat_id, text, &bot_to_matrix, disable_preview).await;
 				} else if let Ok(media) = get_matrix_media(client, message_type.clone()).await {
 					let (media, media_name) = media;
 					let caption = ev.sender().as_str();
-					matrix_file_tg(media_name, media, caption, &bot_to_matrix).await;
+					matrix_file_tg(tg_chat_id, media_name, media, caption, &bot_to_matrix).await;
 				}
 			}
 		},

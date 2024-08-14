@@ -102,7 +102,13 @@ async fn anilist_update(room: &Room) {
 			let request = reqwest_client.post(url).header("Content-Type", "application/json")
 				.json(&json_request)
 				.build().unwrap();
-			let response = reqwest_client.execute(request).await.unwrap();
+			let response = match reqwest_client.execute(request).await {
+				Ok(r) => r,
+				Err(e) => {
+					eprintln!("{:?}", e);
+					return;
+				}
+			};
 			let response_json = response.json::<serde_json::Value>().await.unwrap();
 			let activity = &response_json["data"]["Activity"];
 			let activity_id = activity["id"].as_u64().unwrap();

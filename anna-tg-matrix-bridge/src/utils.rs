@@ -11,15 +11,9 @@ use matrix_sdk::{
 };
 
 use teloxide::{
-	net::Download,
-	payloads::{SendDocumentSetters, SendMessageSetters},
-	requests::Requester,
-	types::{InputFile, Message},
-	Bot,
+	net::Download, payloads::{SendDocumentSetters, SendMessageSetters},
+	requests::Requester, types::{InputFile, Message}, Bot
 };
-
-const MATRIX_CHAT_ID: &str = "!vUWLFTSVVBjhMouZpF:matrix.org";
-const TG_CHAT_ID: i64 = -1001402125530;
 
 pub type MatrixMedia = (String, Vec<u8>);
 
@@ -80,13 +74,32 @@ pub async fn get_tg_bot() -> teloxide::Bot {
 	Bot::new(token)
 }
 
+fn get_user_name(msg: &Message) -> anyhow::Result<String> {
+	let name = if let Some(chat) = msg.sender_chat() {
+		if chat.is_channel() {
+			chat.title().unwrap().to_string()
+		} else {
+			bail!("chat isn't a channel, name not found")
+		}
+	} else if let Some(user) = msg.from() {
+		user.full_name()
+	} else {
+		bail!("user doesn't have \"from\" field")
+	};
+	Ok(name)
+}
+
 pub async fn tg_text_handler(
 	msg: Message,
 	_bot: Arc<Bot>,
 	matrix_client: Client,
 ) -> anyhow::Result<()> {
-	let Some(user) = msg.from() else {
-		bail!("");
+	let user = match get_user_name(&msg) {
+		Ok(user) => user,
+		Err(e) => {
+			eprintln!("{:?}", e);
+			return Ok(());
+		}
 	};
 	let Some(text) = msg.text() else {
 		bail!("");
@@ -94,19 +107,26 @@ pub async fn tg_text_handler(
 	let to_matrix_text = if let Some(reply) = msg.reply_to_message() {
 		let mut chat_link = reply.chat.id.to_string();
 		if let Some(reply_text) = reply.text() {
-			format!("> {}\n{}: {text}", reply_text, user.first_name)
+			format!("> {}\n{}: {text}", reply_text, user)
 		} else {
 			format!(
 				"https://t.me/c/{}/{}\n{}:{text}",
 				chat_link.drain(4..).as_str(),
 				reply.id,
-				user.first_name
+				user
 			)
 		}
 	} else {
-		format!("{}: {text}", user.first_name)
+		format!("{}: {text}", user)
 	};
-	tg_text_matrix(&to_matrix_text, matrix_client).await;
+	let matrix_chat_id = match msg.chat.id.0 {
+		// The Wired
+		-1001402125530i64 => "!vUWLFTSVVBjhMouZpF:matrix.org",
+		// OTHERWORLD
+		-1002152065322i64 => "!6oZjqONVahFLOKTvut:matrix.archneek.me",
+		_ => return Ok(()),
+	};
+	tg_text_matrix(matrix_chat_id.to_string(), &to_matrix_text, matrix_client).await;
 	anyhow::Ok(())
 }
 
@@ -115,26 +135,37 @@ pub async fn tg_photo_handler(
 	bot: Arc<Bot>,
 	matrix_client: Client,
 ) -> anyhow::Result<()> {
-	let Some(user) = msg.from() else {
-		bail!("");
+	let user = match get_user_name(&msg) {
+		Ok(user) => user,
+		Err(e) => {
+			eprintln!("{:?}", e);
+			return Ok(());
+		}
 	};
 	let Some(media_photo) = msg.photo() else {
 		bail!("");
 	};
 	let photo_id = &media_photo.last().unwrap().file.id;
 	let photo_path = bot.get_file(photo_id).await.unwrap().path;
-	let photo_file_path = format!("/tmp/{}:{}:{}.jpg", user.id, msg.id, msg.chat.id);
+	let photo_file_path = format!("/tmp/{}:{}:{}.jpg", user, msg.id, msg.chat.id);
 	let mut photo_dst = tokio::fs::File::create(&photo_file_path).await.unwrap();
 	bot.download_file(&photo_path, &mut photo_dst)
 		.await
 		.unwrap();
-	let sender = format!("from {}:", user.first_name.clone());
-	tg_photo_matrix(photo_file_path, sender, msg.caption(), matrix_client).await?;
+	let sender = format!("from {}:", user);
+	let matrix_chat_id = match msg.chat.id.0 {
+		// The Wired
+		-1001402125530i64 => "!vUWLFTSVVBjhMouZpF:matrix.org",
+		// OTHERWORLD
+		-1002152065322i64 => "!6oZjqONVahFLOKTvut:matrix.archneek.me",
+		_ => return Ok(()),
+	};
+	tg_photo_matrix(matrix_chat_id.to_string(), photo_file_path, sender, msg.caption(), matrix_client).await?;
 	Ok(())
 }
 
-pub async fn matrix_text_tg(text: String, bot: &Bot, preview: bool) {
-	let chat_id = teloxide::types::ChatId(TG_CHAT_ID);
+pub async fn matrix_text_tg(tg_chat_id: i64, text: String, bot: &Bot, preview: bool) {
+	let chat_id = teloxide::types::ChatId(tg_chat_id);
 	match bot
 		.send_message(chat_id, text)
 		.disable_web_page_preview(preview)
@@ -145,8 +176,8 @@ pub async fn matrix_text_tg(text: String, bot: &Bot, preview: bool) {
 	};
 }
 
-pub async fn matrix_file_tg(file: Vec<u8>, file_name: String, caption: &str, bot: &Bot) {
-	let chat_id = teloxide::types::ChatId(TG_CHAT_ID);
+pub async fn matrix_file_tg(tg_chat_id: i64, file: Vec<u8>, file_name: String, caption: &str, bot: &Bot) {
+	let chat_id = teloxide::types::ChatId(tg_chat_id);
 	match bot
 		.send_document(chat_id, InputFile::memory(file).file_name(file_name))
 		.caption(caption)
@@ -157,22 +188,23 @@ pub async fn matrix_file_tg(file: Vec<u8>, file_name: String, caption: &str, bot
 	}
 }
 
-async fn tg_text_matrix(text: &str, matrix_client: matrix_sdk::Client) {
+async fn tg_text_matrix(matrix_chat_id: String, text: &str, matrix_client: matrix_sdk::Client) {
 	let matrix_room = matrix_client
-		.get_room(&RoomId::parse(MATRIX_CHAT_ID).unwrap())
+		.get_room(&RoomId::parse(matrix_chat_id).unwrap())
 		.unwrap();
 	let message = RoomMessageEventContent::text_plain(text);
 	matrix_room.send(message).await.unwrap();
 }
 
 async fn tg_photo_matrix(
+	matrix_chat_id: String,
 	photo_file_path: String,
 	sender: String,
 	caption: Option<&str>,
 	matrix_client: matrix_sdk::Client,
 ) -> anyhow::Result<()> {
 	let matrix_room = matrix_client
-		.get_room(&RoomId::parse(MATRIX_CHAT_ID)?)
+		.get_room(&RoomId::parse(matrix_chat_id)?)
 		.context("")?;
 	let extension_str = std::path::Path::new(&photo_file_path)
 		.extension()
