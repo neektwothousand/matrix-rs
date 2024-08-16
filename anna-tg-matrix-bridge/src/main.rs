@@ -1,8 +1,6 @@
 use std::io::Write;
 use std::sync::Arc;
 
-use anna_tg_matrix_bridge::utils::matrix_file_tg;
-use anna_tg_matrix_bridge::utils::BRIDGES;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::ruma;
 use matrix_sdk::Client;
@@ -20,9 +18,9 @@ use tokio::{
 	io::{AsyncReadExt, AsyncWriteExt},
 };
 
-use anna_tg_matrix_bridge::utils::{
-	get_matrix_media, get_tg_bot, matrix_text_tg, tg_photo_handler, tg_text_handler, tg_file_handler
-};
+use anna_tg_matrix_bridge::matrix_handlers::{matrix_file_tg, matrix_text_tg};
+use anna_tg_matrix_bridge::tg_handlers::{tg_file_handler, tg_text_handler};
+use anna_tg_matrix_bridge::utils::{get_matrix_media, get_tg_bot, BRIDGES};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -107,14 +105,7 @@ async fn main() -> anyhow::Result<()> {
 				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.text().is_some())
 					.endpoint(tg_text_handler),
 			)
-			.branch(
-				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.document().is_some())
-					.endpoint(tg_file_handler),
-			)
-			.branch(
-				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.photo().is_some())
-					.endpoint(tg_photo_handler),
-			);
+			.branch(teloxide::dptree::endpoint(tg_file_handler));
 		Dispatcher::builder(bot, tg_update_handler)
 			.dependencies(teloxide::dptree::deps![client])
 			.build()

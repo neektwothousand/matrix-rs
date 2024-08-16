@@ -103,6 +103,7 @@ dependencies = [
  "anyhow",
  "matrix-sdk",
  "mime",
+ "reqwest",
  "serde",
  "serde_yaml",
  "teloxide",

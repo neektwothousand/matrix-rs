@@ -13,3 +13,4 @@ url = "2.5.2"
 matrix-sdk.workspace = true
 tokio.workspace = true
 serde.workspace = true
+reqwest.workspace = true
