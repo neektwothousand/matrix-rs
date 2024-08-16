@@ -80,7 +80,8 @@ async fn socket_handler(room: Room) {
 async fn anilist_update(room: &Room) -> Option<()> {
 	let reqwest_client = reqwest::Client::builder()
 		.user_agent("deal-lilim")
-		.build().unwrap();
+		.build()
+		.unwrap();
 	let user_ids = [5752916, 6832539];
 	for user_id in user_ids {
 		let mut queries = vec![];
@@ -104,7 +105,8 @@ async fn anilist_update(room: &Room) -> Option<()> {
 				.post(url)
 				.header("Content-Type", "application/json")
 				.json(&json_request)
-				.build().ok()?;
+				.build()
+				.ok()?;
 			let response = match reqwest_client.execute(request).await {
 				Ok(r) => r,
 				Err(e) => {
@@ -140,7 +142,8 @@ async fn anilist_update(room: &Room) -> Option<()> {
 			}
 			let user = &activity.get("user")?.get("name")?.as_str()?;
 			let activity_link = &activity.get("siteUrl")?.as_str()?;
-			let anime = &activity.get("media")?
+			let anime = &activity
+				.get("media")?
 				.get("title")?
 				.get("userPreferred")?
 				.as_str()?;

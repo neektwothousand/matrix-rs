@@ -1,4 +1,4 @@
-use std::{sync::{Arc, LazyLock}};
+use std::sync::{Arc, LazyLock};
 
 use anyhow::{bail, Context};
 
@@ -20,29 +20,39 @@ use teloxide::{
 
 pub type MatrixMedia = (String, Vec<u8>);
 
-pub struct MatrixChat<'a>{
-	pub id: &'a str
+pub struct MatrixChat<'a> {
+	pub id: &'a str,
 }
-pub struct TelegramChat{
-	pub id: i64
+pub struct TelegramChat {
+	pub id: i64,
 }
 pub struct Bridge<'a> {
 	pub matrix_chat: MatrixChat<'a>,
 	pub telegram_chat: TelegramChat,
 }
 
-pub static BRIDGES: LazyLock<Vec<Bridge>> = LazyLock::new(|| { vec![
-	// The Wired
-	Bridge {
-		matrix_chat: MatrixChat { id: "!vUWLFTSVVBjhMouZpF:matrix.org" },
-		telegram_chat: TelegramChat { id: -1001402125530i64 },
-	},
-	// OTHERWORLD
-	Bridge {
-		matrix_chat: MatrixChat { id: "!6oZjqONVahFLOKTvut:matrix.archneek.me" },
-		telegram_chat: TelegramChat{ id: -1002152065322i64 },
-	}
-]});
+pub static BRIDGES: LazyLock<Vec<Bridge>> = LazyLock::new(|| {
+	vec![
+		// The Wired
+		Bridge {
+			matrix_chat: MatrixChat {
+				id: "!vUWLFTSVVBjhMouZpF:matrix.org",
+			},
+			telegram_chat: TelegramChat {
+				id: -1001402125530i64,
+			},
+		},
+		// OTHERWORLD
+		Bridge {
+			matrix_chat: MatrixChat {
+				id: "!6oZjqONVahFLOKTvut:matrix.archneek.me",
+			},
+			telegram_chat: TelegramChat {
+				id: -1002152065322i64,
+			},
+		},
+	]
+});
 
 pub trait GetMatrixMedia {
 	fn get_media(

@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
 			for bridge in BRIDGES.iter() {
 				if room.room_id().as_str() == bridge.matrix_chat.id {
 					tg_chat_id = bridge.telegram_chat.id;
-					break
+					break;
 				}
 			}
 			if tg_chat_id == 0 {
