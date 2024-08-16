@@ -4,7 +4,7 @@ use anyhow::{bail, Context};
 
 use matrix_sdk::{
 	ruma::{
-		events::room::message::{ImageMessageEventContent, MessageType, RoomMessageEventContent},
+		events::room::message::{FileMessageEventContent, ImageMessageEventContent, MessageType, RoomMessageEventContent},
 		RoomId,
 	},
 	Client,
@@ -167,6 +167,46 @@ pub async fn tg_text_handler(
 	anyhow::Ok(())
 }
 
+pub async fn tg_file_handler(
+	msg: Message,
+	bot: Arc<Bot>,
+	matrix_client: Client,
+) -> anyhow::Result<()> {
+	let user = match get_user_name(&msg) {
+		Ok(user) => user,
+		Err(e) => {
+			eprintln!("{:?}", e);
+			return Ok(());
+		}
+	};
+	let Some(document) = msg.document() else {
+		bail!("");
+	};
+	let document_id = &document.file.id;
+	let document_path = bot.get_file(document_id).await.unwrap().path;
+	let document_file_path = format!("/tmp/{}:{}:{}.jpg", user, msg.id, msg.chat.id);
+	let mut document_dst = tokio::fs::File::create(&document_file_path).await.unwrap();
+	bot.download_file(&document_path, &mut document_dst)
+		.await
+		.unwrap();
+	let sender = format!("from {}:", user);
+	let mut matrix_chat_id = String::new();
+	for bridge in BRIDGES.iter() {
+		if msg.chat.id.0 == bridge.telegram_chat.id {
+			matrix_chat_id = bridge.matrix_chat.id.to_string();
+			break;
+		}
+	}
+	tg_document_matrix(
+		matrix_chat_id.to_string(),
+		document_file_path,
+		sender,
+		msg.caption(),
+		matrix_client,
+	)
+	.await?;
+	Ok(())
+}
 pub async fn tg_photo_handler(
 	msg: Message,
 	bot: Arc<Bot>,
@@ -260,8 +300,9 @@ async fn tg_photo_matrix(
 		.extension()
 		.context("")?;
 	let content_type = match extension_str.to_str().unwrap() {
-		"jpg" | "jpeg" => "image/jpeg".parse::<mime::Mime>().unwrap(),
-		_ => bail!(""),
+		"jpg" | "jpeg" => mime::IMAGE_JPEG,
+		"png" => mime::IMAGE_PNG,
+		_ => mime::APPLICATION_OCTET_STREAM,
 	};
 	let photo = std::fs::read(photo_file_path)?;
 	let mxc_uri = matrix_client
@@ -277,6 +318,48 @@ async fn tg_photo_matrix(
 	let message = RoomMessageEventContent::text_plain(sender);
 	matrix_room.send(message).await?;
 	let message = RoomMessageEventContent::new(MessageType::Image(image_message));
+	matrix_room.send(message).await?;
+
+	if let Some(caption) = caption {
+		let message = RoomMessageEventContent::text_plain(caption);
+		matrix_room.send(message).await?;
+	}
+
+	Ok(())
+}
+
+async fn tg_document_matrix(
+	matrix_chat_id: String,
+	document_file_path: String,
+	sender: String,
+	caption: Option<&str>,
+	matrix_client: matrix_sdk::Client,
+) -> anyhow::Result<()> {
+	let matrix_room = matrix_client
+		.get_room(&RoomId::parse(matrix_chat_id)?)
+		.context("")?;
+	let extension_str = std::path::Path::new(&document_file_path)
+		.extension()
+		.context("")?;
+	let content_type = match extension_str.to_str().unwrap() {
+		"jpg" | "jpeg" => mime::IMAGE_JPEG,
+		"png" => mime::IMAGE_PNG,
+		_ => mime::APPLICATION_OCTET_STREAM,
+	};
+	let document = std::fs::read(document_file_path)?;
+	let mxc_uri = matrix_client
+		.media()
+		.upload(&content_type, document)
+		.await
+		.unwrap()
+		.content_uri;
+	let document_message = FileMessageEventContent::new(
+		"tg_document".to_string(),
+		matrix_sdk::ruma::events::room::MediaSource::Plain(mxc_uri),
+	);
+	let message = RoomMessageEventContent::text_plain(sender);
+	matrix_room.send(message).await?;
+	let message = RoomMessageEventContent::new(MessageType::File(document_message));
 	matrix_room.send(message).await?;
 
 	if let Some(caption) = caption {

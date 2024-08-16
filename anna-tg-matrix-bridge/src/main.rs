@@ -21,7 +21,7 @@ use tokio::{
 };
 
 use anna_tg_matrix_bridge::utils::{
-	get_matrix_media, get_tg_bot, matrix_text_tg, tg_photo_handler, tg_text_handler,
+	get_matrix_media, get_tg_bot, matrix_text_tg, tg_photo_handler, tg_text_handler, tg_file_handler
 };
 
 #[tokio::main]
@@ -106,6 +106,10 @@ async fn main() -> anyhow::Result<()> {
 			.branch(
 				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.text().is_some())
 					.endpoint(tg_text_handler),
+			)
+			.branch(
+				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.document().is_some())
+					.endpoint(tg_file_handler),
 			)
 			.branch(
 				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.photo().is_some())
