@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::{Arc, LazyLock}};
 
 use anyhow::{bail, Context};
 
@@ -19,6 +19,30 @@ use teloxide::{
 };
 
 pub type MatrixMedia = (String, Vec<u8>);
+
+pub struct MatrixChat<'a>{
+	pub id: &'a str
+}
+pub struct TelegramChat{
+	pub id: i64
+}
+pub struct Bridge<'a> {
+	pub matrix_chat: MatrixChat<'a>,
+	pub telegram_chat: TelegramChat,
+}
+
+pub static BRIDGES: LazyLock<Vec<Bridge>> = LazyLock::new(|| { vec![
+	// The Wired
+	Bridge {
+		matrix_chat: MatrixChat { id: "!vUWLFTSVVBjhMouZpF:matrix.org" },
+		telegram_chat: TelegramChat { id: -1001402125530i64 },
+	},
+	// OTHERWORLD
+	Bridge {
+		matrix_chat: MatrixChat { id: "!6oZjqONVahFLOKTvut:matrix.archneek.me" },
+		telegram_chat: TelegramChat{ id: -1002152065322i64 },
+	}
+]});
 
 pub trait GetMatrixMedia {
 	fn get_media(
@@ -122,14 +146,14 @@ pub async fn tg_text_handler(
 	} else {
 		format!("{}: {text}", user)
 	};
-	let matrix_chat_id = match msg.chat.id.0 {
-		// The Wired
-		-1001402125530i64 => "!vUWLFTSVVBjhMouZpF:matrix.org",
-		// OTHERWORLD
-		-1002152065322i64 => "!6oZjqONVahFLOKTvut:matrix.archneek.me",
-		_ => return Ok(()),
-	};
-	tg_text_matrix(matrix_chat_id.to_string(), &to_matrix_text, matrix_client).await;
+	let mut matrix_chat_id = String::new();
+	for bridge in BRIDGES.iter() {
+		if msg.chat.id.0 == bridge.telegram_chat.id {
+			matrix_chat_id = bridge.matrix_chat.id.to_string();
+			break;
+		}
+	}
+	tg_text_matrix(matrix_chat_id, &to_matrix_text, matrix_client).await;
 	anyhow::Ok(())
 }
 
@@ -156,13 +180,13 @@ pub async fn tg_photo_handler(
 		.await
 		.unwrap();
 	let sender = format!("from {}:", user);
-	let matrix_chat_id = match msg.chat.id.0 {
-		// The Wired
-		-1001402125530i64 => "!vUWLFTSVVBjhMouZpF:matrix.org",
-		// OTHERWORLD
-		-1002152065322i64 => "!6oZjqONVahFLOKTvut:matrix.archneek.me",
-		_ => return Ok(()),
-	};
+	let mut matrix_chat_id = String::new();
+	for bridge in BRIDGES.iter() {
+		if msg.chat.id.0 == bridge.telegram_chat.id {
+			matrix_chat_id = bridge.matrix_chat.id.to_string();
+			break;
+		}
+	}
 	tg_photo_matrix(
 		matrix_chat_id.to_string(),
 		photo_file_path,

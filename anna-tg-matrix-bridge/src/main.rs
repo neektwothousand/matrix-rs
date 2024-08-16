@@ -2,6 +2,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 use anna_tg_matrix_bridge::utils::matrix_file_tg;
+use anna_tg_matrix_bridge::utils::BRIDGES;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::ruma;
 use matrix_sdk::Client;
@@ -70,13 +71,16 @@ async fn main() -> anyhow::Result<()> {
 			if !std::path::Path::new("anna.log").exists() {
 				std::fs::File::create("anna.log").unwrap();
 			}
-			let tg_chat_id = match room.room_id().as_str() {
-				// The Wired
-				"!vUWLFTSVVBjhMouZpF:matrix.org" => -1001402125530i64,
-				// OTHERWORLD
-				"!6oZjqONVahFLOKTvut:matrix.archneek.me" => -1002152065322i64,
-				_ => return,
-			};
+			let mut tg_chat_id: i64 = 0;
+			for bridge in BRIDGES.iter() {
+				if room.room_id().as_str() == bridge.matrix_chat.id {
+					tg_chat_id = bridge.telegram_chat.id;
+					break
+				}
+			}
+			if tg_chat_id == 0 {
+				return;
+			}
 			let mut log = std::fs::OpenOptions::new()
 				.append(true)
 				.open("anna.log")
