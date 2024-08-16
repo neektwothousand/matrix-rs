@@ -77,7 +77,10 @@ async fn socket_handler(room: Room) {
 	}
 }
 
-async fn anilist_update(room: &Room) {
+async fn anilist_update(room: &Room) -> Option<()> {
+	let reqwest_client = reqwest::Client::builder()
+		.user_agent("deal-lilim")
+		.build().unwrap();
 	let user_ids = [5752916, 6832539];
 	for user_id in user_ids {
 		let mut queries = vec![];
@@ -97,35 +100,31 @@ async fn anilist_update(room: &Room) {
 				"query": query
 			});
 			let url = "https://graphql.anilist.co/";
-			let reqwest_client = reqwest::Client::builder()
-				.user_agent("deal-lilim")
-				.build()
-				.unwrap();
 			let request = reqwest_client
 				.post(url)
 				.header("Content-Type", "application/json")
 				.json(&json_request)
-				.build()
-				.unwrap();
+				.build().ok()?;
 			let response = match reqwest_client.execute(request).await {
 				Ok(r) => r,
 				Err(e) => {
 					eprintln!("{:?}", e);
-					return;
+					return Some(());
 				}
 			};
-			let response_json = response.json::<serde_json::Value>().await.unwrap();
-			let activity = &response_json["data"]["Activity"];
-			let activity_id = activity["id"].as_u64().unwrap();
+			let response_json = response.json::<serde_json::Value>().await.ok()?;
+			let activity = &response_json.get("data")?.get("Activity")?;
+			let activity_id = activity.get("id")?.as_u64()?;
 			let file_name = format!("anilist_{user_id}_last_id");
 			let anilist_last_id = {
 				let file = File::options().read(true).open(&file_name);
-				if file.is_err() {
-					0u64
-				} else {
-					let mut buf = String::new();
-					file.unwrap().read_to_string(&mut buf).unwrap();
-					buf.parse::<u64>().unwrap()
+				match file {
+					Ok(mut file) => {
+						let mut buf = String::new();
+						file.read_to_string(&mut buf).ok()?;
+						buf.parse::<u64>().ok()?
+					}
+					Err(_) => 0u64,
 				}
 			};
 			if activity_id == anilist_last_id {
@@ -137,15 +136,16 @@ async fn anilist_update(room: &Room) {
 					.truncate(true)
 					.open(file_name)
 					.unwrap();
-				file.write_all(activity_id.to_string().as_bytes()).unwrap();
+				file.write_all(activity_id.to_string().as_bytes()).ok()?;
 			}
-			let user = &activity["user"]["name"].as_str().unwrap();
-			let activity_link = &activity["siteUrl"].as_str().unwrap();
-			let anime = &activity["media"]["title"]["userPreferred"]
-				.as_str()
-				.unwrap();
-			let status = &activity["status"].as_str().unwrap();
-			let progress = &activity["progress"].as_str().unwrap_or_default();
+			let user = &activity.get("user")?.get("name")?.as_str()?;
+			let activity_link = &activity.get("siteUrl")?.as_str()?;
+			let anime = &activity.get("media")?
+				.get("title")?
+				.get("userPreferred")?
+				.as_str()?;
+			let status = &activity.get("status")?.as_str()?;
+			let progress = &activity.get("progress")?.as_str().unwrap_or_default();
 			let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
 			room.send(RoomMessageEventContent::text_plain(result))
 				.await
@@ -153,6 +153,7 @@ async fn anilist_update(room: &Room) {
 			sleep(Duration::from_secs(10)).await;
 		}
 	}
+	Some(())
 }
 
 #[tokio::main]
