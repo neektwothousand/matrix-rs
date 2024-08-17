@@ -109,8 +109,7 @@ pub async fn tg_file_handler(
 	let mxc_uri = matrix_client
 		.media()
 		.upload(&content_type, document.to_vec())
-		.await
-		.unwrap()
+		.await?
 		.content_uri;
 
 	let file_message = match content_type.type_().as_str() {
