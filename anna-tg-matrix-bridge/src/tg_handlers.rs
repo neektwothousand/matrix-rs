@@ -122,7 +122,7 @@ pub async fn tg_file_handler(
 		}
 		"video" => {
 			let event_content = VideoMessageEventContent::new(
-				"tg_image".to_string(),
+				"tg_video".to_string(),
 				matrix_sdk::ruma::events::room::MediaSource::Plain(mxc_uri),
 			);
 			RoomMessageEventContent::new(MessageType::Video(event_content))
