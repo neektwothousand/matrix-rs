@@ -86,7 +86,7 @@ pub async fn tg_file_handler(
 		eprintln!("unknown message type: {:?}", &msg);
 		return Ok(());
 	};
-	let file_path = bot.get_file(file_id).await.unwrap().path;
+	let file_path = bot.get_file(file_id).await?.path;
 	let file_url = format!(
 		"https://api.telegram.org/file/bot{}/{file_path}",
 		bot.token()
