@@ -1,10 +1,12 @@
 use std::sync::LazyLock;
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 
 use matrix_sdk::{ruma::events::room::message::MessageType, Client};
 
 use teloxide::{types::Message, Bot};
+
+use serde_json;
 
 pub type MatrixMedia = (String, Vec<u8>);
 
@@ -65,7 +67,9 @@ impl GetMatrixMedia for MatrixMedia {
 				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
 					bail!("");
 				};
-				Ok((m.body, media))
+				let value = serde_json::to_value(&m)?;
+				let body = value.get("body").context(dbg!("body not found"))?;
+				Ok((body.to_string(), media))
 			}
 			MessageType::Image(m) => {
 				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
@@ -94,12 +98,9 @@ pub async fn get_matrix_media(
 	client: Client,
 	message_type: MessageType,
 ) -> anyhow::Result<(String, Vec<u8>)> {
-	let Ok(media) =
+	let media =
 		<(String, Vec<u8>) as GetMatrixMedia>::get_media(client.clone(), message_type.clone())
-			.await
-	else {
-		bail!("");
-	};
+			.await?;
 	Ok(media)
 }
 
