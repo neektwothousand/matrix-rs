@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.86"
 teloxide = { version = "0.12.2", default-features = false, features = ["ctrlc_handler", "rustls"] }
 serde_yaml = "0.9.34"
 mime = "0.3.17"
@@ -13,4 +12,6 @@ url = "2.5.2"
 matrix-sdk.workspace = true
 tokio.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 reqwest.workspace = true
+anyhow.workspace = true
