@@ -105,6 +105,7 @@ dependencies = [
  "mime",
  "reqwest",
  "serde",
+ "serde_json",
  "serde_yaml",
  "teloxide",
  "tokio",
@@ -681,6 +682,7 @@ dependencies = [
 name = "deal-lilim"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "matrix-sdk",
  "reqwest",
  "serde",
