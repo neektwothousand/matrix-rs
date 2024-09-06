@@ -91,10 +91,16 @@ async fn main() -> anyhow::Result<()> {
 					let text = format!("{}: {}", ev.sender().as_str(), text.body);
 					let disable_preview = false;
 					matrix_text_tg(tg_chat_id, text, &bot_to_matrix, disable_preview).await;
-				} else if let Ok(media) = get_matrix_media(client, message_type.clone()).await {
-					let (media, media_name) = media;
-					let caption = ev.sender().as_str();
-					matrix_file_tg(tg_chat_id, media_name, media, caption, &bot_to_matrix).await;
+				} else {
+					match get_matrix_media(client, message_type.clone()).await {
+						Ok(media) => {
+							let (media, media_name) = media;
+							let caption = ev.sender().as_str();
+							matrix_file_tg(tg_chat_id, media_name, media, caption, &bot_to_matrix)
+								.await;
+						}
+						Err(e) => eprintln!("{:?}", e),
+					}
 				}
 			}
 		},
