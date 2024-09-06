@@ -5,6 +5,7 @@ use std::{
 	path::Path,
 };
 
+use anyhow::Context;
 use matrix_sdk::{
 	config::SyncSettings,
 	ruma::api::client::message::send_message_event,
@@ -77,19 +78,36 @@ async fn socket_handler(room: Room) {
 	}
 }
 
-async fn anilist_update(room: &Room) -> Option<()> {
+async fn anilist_update(room: &Room) -> Result<(), anyhow::Error> {
 	let reqwest_client = reqwest::Client::builder()
 		.user_agent("deal-lilim")
 		.build()
 		.unwrap();
 	let user_ids = [5752916, 6832539];
 	for user_id in user_ids {
+		let file_name = format!("anilist_{user_id}_createdAt");
+		let last_created_at = {
+			let file = File::options().read(true).open(&file_name);
+			match file {
+				Ok(mut file) => {
+					let mut buf = String::new();
+					file.read_to_string(&mut buf)?;
+					buf.trim().parse::<u64>()?
+				}
+				Err(_) => 0u64,
+			}
+		};
 		let mut queries = vec![];
 		queries.push(format!(
 			"{{
-				Activity(userId: {user_id}, sort: ID_DESC) {{
+				Activity(userId: {user_id}, createdAt_greater: {last_created_at}) {{
 					... on ListActivity {{
-						siteUrl id user {{ name }} status progress media {{
+						siteUrl
+						createdAt
+						user {{ name }}
+						status
+						progress
+						media {{
 							title {{ userPreferred }}
 						}}
 					}}
@@ -105,58 +123,75 @@ async fn anilist_update(room: &Room) -> Option<()> {
 				.post(url)
 				.header("Content-Type", "application/json")
 				.json(&json_request)
-				.build()
-				.ok()?;
+				.build()?;
 			let response = match reqwest_client.execute(request).await {
 				Ok(r) => r,
 				Err(e) => {
 					eprintln!("{:?}", e);
-					return Some(());
+					return Err(anyhow::anyhow!(e.to_string()));
 				}
 			};
-			let response_json = response.json::<serde_json::Value>().await.ok()?;
-			let activity = &response_json.get("data")?.get("Activity")?;
-			let activity_id = activity.get("id")?.as_u64()?;
-			let file_name = format!("anilist_{user_id}_last_id");
-			let anilist_last_id = {
-				let file = File::options().read(true).open(&file_name);
-				match file {
-					Ok(mut file) => {
-						let mut buf = String::new();
-						file.read_to_string(&mut buf).ok()?;
-						buf.parse::<u64>().ok()?
-					}
-					Err(_) => 0u64,
-				}
-			};
-			if activity_id == anilist_last_id {
-				continue;
-			} else {
-				let mut file = File::options()
-					.write(true)
-					.create(true)
-					.truncate(true)
-					.open(file_name)
-					.unwrap();
-				file.write_all(activity_id.to_string().as_bytes()).ok()?;
-			}
-			let user = &activity.get("user")?.get("name")?.as_str()?;
-			let activity_link = &activity.get("siteUrl")?.as_str()?;
-			let anime = &activity
-				.get("media")?
-				.get("title")?
-				.get("userPreferred")?
-				.as_str()?;
-			let status = &activity.get("status")?.as_str()?;
-			let progress = &activity.get("progress")?.as_str().unwrap_or_default();
-			let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
-			room.send(RoomMessageEventContent::text_plain(result))
-				.await
+			let response_json = response.json::<serde_json::Value>().await?;
+			let activity = &response_json
+				.get("data")
+				.context("data not found")?
+				.get("Activity")
+				.context("activity not found")?;
+			let activity_created_at = activity
+				.get("createdAt")
+				.context("createdAt not found")?
+				.as_u64()
 				.unwrap();
+			if activity_created_at <= last_created_at {
+				continue;
+			}
+			let user = &activity
+				.get("user")
+				.context("user not found")?
+				.get("name")
+				.context("user name not found")?
+				.as_str()
+				.unwrap();
+			let activity_link = &activity
+				.get("siteUrl")
+				.context("siteUrl not found")?
+				.as_str()
+				.unwrap();
+			let anime = &activity
+				.get("media")
+				.context("media not found")?
+				.get("title")
+				.context("media title not found")?
+				.get("userPreferred")
+				.context("userPreferred not found")?
+				.as_str()
+				.unwrap();
+			let status = &activity
+				.get("status")
+				.context("status not found")?
+				.as_str()
+				.unwrap();
+			let progress = &activity
+				.get("progress")
+				.context("progress not found")?
+				.as_str()
+				.unwrap_or_default();
+			let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
+			if let Err(e) = room.send(RoomMessageEventContent::text_plain(result)).await {
+				eprintln!("{:?}", e);
+				continue;
+			}
+			let mut file = File::options()
+				.write(true)
+				.create(true)
+				.truncate(true)
+				.open(&file_name)
+				.unwrap();
+			file.write_all(activity_created_at.to_string().as_bytes())?;
 			sleep(Duration::from_secs(10)).await;
 		}
 	}
-	Some(())
+	Ok(())
 }
 
 #[tokio::main]
@@ -197,8 +232,11 @@ async fn main() {
 	spawn(async move {
 		let room = room.clone();
 		loop {
-			anilist_update(&room).await;
-			sleep(Duration::from_secs(300)).await;
+			let result = anilist_update(&room).await;
+			if result.is_err() {
+				eprintln!("{:?}", result);
+			}
+			sleep(Duration::from_secs(30)).await;
 		}
 	});
 
