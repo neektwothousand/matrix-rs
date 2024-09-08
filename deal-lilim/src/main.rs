@@ -97,8 +97,7 @@ async fn anilist_update(room: &Room) -> Result<(), anyhow::Error> {
 				Err(_) => 0u64,
 			}
 		};
-		let mut queries = vec![];
-		queries.push(format!(
+		let query = format!(
 			"{{
 				Activity(userId: {user_id}, createdAt_greater: {last_created_at}) {{
 					... on ListActivity {{
@@ -113,83 +112,81 @@ async fn anilist_update(room: &Room) -> Result<(), anyhow::Error> {
 					}}
 				}}
 			}}"
-		));
-		for query in queries {
-			let json_request = serde_json::json!({
-				"query": query
-			});
-			let url = "https://graphql.anilist.co/";
-			let request = reqwest_client
-				.post(url)
-				.header("Content-Type", "application/json")
-				.json(&json_request)
-				.build()?;
-			let response = match reqwest_client.execute(request).await {
-				Ok(r) => r,
-				Err(e) => {
-					eprintln!("{:?}", e);
-					return Err(anyhow::anyhow!(e.to_string()));
-				}
-			};
-			let response_json = response.json::<serde_json::Value>().await?;
-			let activity = &response_json
-				.get("data")
-				.context("data not found")?
-				.get("Activity")
-				.context("activity not found")?;
-			let activity_created_at = activity
-				.get("createdAt")
-				.context("createdAt not found")?
-				.as_u64()
-				.unwrap();
-			if activity_created_at <= last_created_at {
-				continue;
-			}
-			let user = &activity
-				.get("user")
-				.context("user not found")?
-				.get("name")
-				.context("user name not found")?
-				.as_str()
-				.unwrap();
-			let activity_link = &activity
-				.get("siteUrl")
-				.context("siteUrl not found")?
-				.as_str()
-				.unwrap();
-			let anime = &activity
-				.get("media")
-				.context("media not found")?
-				.get("title")
-				.context("media title not found")?
-				.get("userPreferred")
-				.context("userPreferred not found")?
-				.as_str()
-				.unwrap();
-			let status = &activity
-				.get("status")
-				.context("status not found")?
-				.as_str()
-				.unwrap();
-			let progress = &activity
-				.get("progress")
-				.context("progress not found")?
-				.as_str()
-				.unwrap_or_default();
-			let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
-			if let Err(e) = room.send(RoomMessageEventContent::text_plain(result)).await {
+		);
+		let json_request = serde_json::json!({
+			"query": query
+		});
+		let url = "https://graphql.anilist.co/";
+		let request = reqwest_client
+			.post(url)
+			.header("Content-Type", "application/json")
+			.json(&json_request)
+			.build()?;
+		let response = match reqwest_client.execute(request).await {
+			Ok(r) => r,
+			Err(e) => {
 				eprintln!("{:?}", e);
-				continue;
+				return Err(anyhow::anyhow!(e.to_string()));
 			}
-			let mut file = File::options()
-				.write(true)
-				.create(true)
-				.truncate(true)
-				.open(&file_name)
-				.unwrap();
-			file.write_all(activity_created_at.to_string().as_bytes())?;
-			sleep(Duration::from_secs(10)).await;
+		};
+		let response_json = response.json::<serde_json::Value>().await?;
+		let activity = &response_json
+			.get("data")
+			.context("data not found")?
+			.get("Activity")
+			.context("activity not found")?;
+		let activity_created_at = activity
+			.get("createdAt")
+			.context("createdAt not found")?
+			.as_u64()
+			.unwrap();
+		if activity_created_at <= last_created_at {
+			continue;
 		}
+		let user = &activity
+			.get("user")
+			.context("user not found")?
+			.get("name")
+			.context("user name not found")?
+			.as_str()
+			.unwrap();
+		let activity_link = &activity
+			.get("siteUrl")
+			.context("siteUrl not found")?
+			.as_str()
+			.unwrap();
+		let anime = &activity
+			.get("media")
+			.context("media not found")?
+			.get("title")
+			.context("media title not found")?
+			.get("userPreferred")
+			.context("userPreferred not found")?
+			.as_str()
+			.unwrap();
+		let status = &activity
+			.get("status")
+			.context("status not found")?
+			.as_str()
+			.unwrap();
+		let progress = &activity
+			.get("progress")
+			.context("progress not found")?
+			.as_str()
+			.unwrap_or_default();
+		let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
+		if let Err(e) = room.send(RoomMessageEventContent::text_plain(result)).await {
+			eprintln!("{:?}", e);
+			continue;
+		}
+		let mut file = File::options()
+			.write(true)
+			.create(true)
+			.truncate(true)
+			.open(&file_name)
+			.unwrap();
+		file.write_all(activity_created_at.to_string().as_bytes())?;
+		sleep(Duration::from_secs(10)).await;
 	}
 	Ok(())
 }
