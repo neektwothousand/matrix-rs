@@ -135,11 +135,14 @@ async fn anilist_update(room: &Room) -> Result<(), anyhow::Error> {
 			.context("data not found")?
 			.get("Activity")
 			.context("activity not found")?;
-		let activity_created_at = activity
-			.get("createdAt")
-			.context("createdAt not found")?
-			.as_u64()
-			.unwrap();
+		let activity_created_at = {
+			if let Some(activity) = activity.get("createdAt") {
+				activity.as_u64().unwrap()
+			} else {
+				continue;
+			}
+		};
+
 		if activity_created_at <= last_created_at {
 			continue;
 		}
