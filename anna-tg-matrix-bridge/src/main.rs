@@ -1,4 +1,3 @@
-use std::io::Write;
 use std::sync::Arc;
 
 use matrix_sdk::config::SyncSettings;
@@ -24,6 +23,8 @@ use anna_tg_matrix_bridge::utils::{get_matrix_media, get_tg_bot, BRIDGES};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+	simple_logger::SimpleLogger::new().env().init().unwrap();
+
 	#[derive(Serialize, Deserialize)]
 	struct User {
 		name: String,
@@ -66,9 +67,6 @@ async fn main() -> anyhow::Result<()> {
 			if ev.sender().as_str() == matrix_client_id {
 				return;
 			}
-			if !std::path::Path::new("anna.log").exists() {
-				std::fs::File::create("anna.log").unwrap();
-			}
 			let mut tg_chat_id: i64 = 0;
 			for bridge in BRIDGES.iter() {
 				if room.room_id().as_str() == bridge.matrix_chat.id {
@@ -79,18 +77,24 @@ async fn main() -> anyhow::Result<()> {
 			if tg_chat_id == 0 {
 				return;
 			}
-			let mut log = std::fs::OpenOptions::new()
-				.append(true)
-				.open("anna.log")
-				.unwrap();
-			log.write_all(format!("{:?}\n", ev.event_id()).as_bytes())
-				.unwrap();
 			if let SyncMessageLikeEvent::Original(original_message) = ev.clone() {
 				let message_type = &original_message.content.msgtype;
 				if let MessageType::Text(text) = message_type {
 					let text = format!("{}: {}", ev.sender().as_str(), text.body);
+					let matrix_event = ev.as_original().unwrap();
 					let disable_preview = false;
-					matrix_text_tg(tg_chat_id, text, &bot_to_matrix, disable_preview).await;
+					if let Err(e) = matrix_text_tg(
+						tg_chat_id,
+						text,
+						matrix_event,
+						room,
+						&bot_to_matrix,
+						disable_preview,
+					)
+					.await
+					{
+						eprintln!("{:?}", e);
+					};
 				} else {
 					match get_matrix_media(client, message_type.clone()).await {
 						Ok(media) => {
@@ -119,9 +123,9 @@ async fn main() -> anyhow::Result<()> {
 			.await;
 	});
 	if matrix_client.user_id().is_some() {
-		println!("matrix client logged in");
+		log::info!("matrix client logged in");
 	}
-	println!("tg dispatched");
+	log::info!("tg dispatched");
 	loop {
 		let client_sync = matrix_client.sync(SyncSettings::default()).await;
 		if let Err(ref e) = client_sync {

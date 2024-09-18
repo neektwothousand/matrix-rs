@@ -1,12 +1,24 @@
-use std::sync::LazyLock;
+use std::{
+	fs::File,
+	path::Path,
+	sync::LazyLock,
+};
 
 use anyhow::{bail, Context};
 
-use matrix_sdk::{ruma::events::room::message::MessageType, Client};
+use matrix_sdk::{
+	ruma::{events::room::message::MessageType, OwnedEventId},
+	Client,
+};
 
-use teloxide::{types::Message, Bot};
+use teloxide::{
+	types::{ChatId, Message, MessageId},
+	Bot,
+};
 
 use serde_json;
+
+use crate::db::BridgedMessage;
 
 pub type MatrixMedia = (String, Vec<u8>);
 
@@ -52,6 +64,8 @@ pub static BRIDGES: LazyLock<Vec<Bridge>> = LazyLock::new(|| {
 		},
 	]
 });
+
+pub static BM_FILE_PATH: LazyLock<&str> = LazyLock::new(|| "bridged_messages");
 
 pub trait GetMatrixMedia {
 	fn get_media(
@@ -122,4 +136,28 @@ pub fn get_user_name(msg: &Message) -> anyhow::Result<String> {
 		bail!("user doesn't have \"from\" field")
 	};
 	Ok(name)
+}
+
+pub fn update_bridged_messages(
+	matrix_event_id: OwnedEventId,
+	telegram_event_id: (ChatId, MessageId),
+) -> anyhow::Result<()> {
+	let bm_file_path = &*BM_FILE_PATH;
+	if !Path::new(bm_file_path).exists() {
+		File::create_new(bm_file_path)?;
+	}
+	let mut bridged_messages: Vec<BridgedMessage> =
+		match serde_json::from_reader(File::open(bm_file_path)?) {
+			Ok(bm) => bm,
+			Err(e) => {
+				log::debug!("{}:{}:{}", file!(), line!(), e);
+				vec![]
+			}
+		};
+	bridged_messages.push(BridgedMessage {
+		matrix_id: matrix_event_id,
+		telegram_id: (telegram_event_id.0, telegram_event_id.1),
+	});
+	serde_json::to_writer(&mut File::create(bm_file_path)?, &bridged_messages).unwrap();
+	Ok(())
 }

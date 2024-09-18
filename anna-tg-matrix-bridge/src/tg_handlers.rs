@@ -1,9 +1,13 @@
+use std::fs::File;
 use std::sync::Arc;
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use matrix_sdk::ruma::events::room::message::{
-	FileMessageEventContent, ImageMessageEventContent, MessageType, VideoMessageEventContent,
+	AddMentions, FileMessageEventContent, ForwardThread, ImageMessageEventContent, MessageType,
+	VideoMessageEventContent,
 };
+use matrix_sdk::ruma::events::OriginalMessageLikeEvent;
+use matrix_sdk::ruma::OwnedEventId;
 use teloxide::Bot;
 use teloxide::{prelude::Requester, types::Message};
 
@@ -12,39 +16,42 @@ use matrix_sdk::{
 	Client,
 };
 
-use crate::utils::{get_user_name, BRIDGES};
+use crate::db::BridgedMessage;
+use crate::utils::{get_user_name, update_bridged_messages, BM_FILE_PATH, BRIDGES};
+
+fn find_bm(tg_reply: &Message) -> anyhow::Result<OwnedEventId> {
+	let bm_file_path = &*BM_FILE_PATH;
+	let bridged_messages: Vec<BridgedMessage> =
+		match serde_json::from_reader(File::open(bm_file_path)?) {
+			Ok(bm) => bm,
+			Err(e) => bail!("{}", e),
+		};
+	let Some(bridged_message) = bridged_messages
+		.iter()
+		.find(|t| t.telegram_id == (tg_reply.chat.id, tg_reply.id))
+	else {
+		bail!("message not found");
+	};
+	Ok(bridged_message.matrix_id.clone())
+}
 
 pub async fn tg_text_handler(
-	msg: Message,
+	t_msg: Message,
 	_bot: Arc<Bot>,
 	matrix_client: Client,
 ) -> anyhow::Result<()> {
-	let user = match get_user_name(&msg) {
+	let user = match get_user_name(&t_msg) {
 		Ok(user) => user,
 		Err(e) => {
 			eprintln!("{:?}", e);
 			return Ok(());
 		}
 	};
-	let text = msg.text().unwrap();
-	let to_matrix_text = if let Some(reply) = msg.reply_to_message() {
-		let mut chat_link = reply.chat.id.to_string();
-		if let Some(reply_text) = reply.text() {
-			format!("> {}\n{}: {text}", reply_text, user)
-		} else {
-			format!(
-				"https://t.me/c/{}/{}\n{}:{text}",
-				chat_link.drain(4..).as_str(),
-				reply.id,
-				user
-			)
-		}
-	} else {
-		format!("{}: {text}", user)
-	};
+	let text = t_msg.text().unwrap();
+	let to_matrix_text = format!("{}: {text}", user);
 	let mut matrix_chat_id = String::new();
 	for bridge in BRIDGES.iter() {
-		if msg.chat.id.0 == bridge.telegram_chat.id {
+		if t_msg.chat.id.0 == bridge.telegram_chat.id {
 			matrix_chat_id = bridge.matrix_chat.id.to_string();
 			break;
 		}
@@ -52,8 +59,28 @@ pub async fn tg_text_handler(
 	let matrix_room = matrix_client
 		.get_room(&RoomId::parse(matrix_chat_id)?)
 		.unwrap();
-	let message = RoomMessageEventContent::text_plain(to_matrix_text);
-	matrix_room.send(message).await?;
+	let message = if let Some(reply) = t_msg.reply_to_message() {
+		let find_bm_result = find_bm(reply);
+		if let Ok(matrix_event_id) = find_bm_result {
+			let original_message: OriginalMessageLikeEvent<RoomMessageEventContent> = matrix_room
+				.event(&matrix_event_id)
+				.await?
+				.event
+				.deserialize_as()?;
+			RoomMessageEventContent::text_plain(to_matrix_text).make_reply_to(
+				&original_message,
+				ForwardThread::No,
+				AddMentions::No,
+			)
+		} else {
+			log::info!("{:?}", find_bm_result);
+			RoomMessageEventContent::text_plain(to_matrix_text)
+		}
+	} else {
+		RoomMessageEventContent::text_plain(to_matrix_text)
+	};
+	let sent_mt_msg = matrix_room.send(message).await?;
+	update_bridged_messages(sent_mt_msg.event_id, (t_msg.chat.id, t_msg.id))?;
 	anyhow::Ok(())
 }
 

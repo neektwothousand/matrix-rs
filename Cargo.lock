@@ -104,6 +104,7 @@ dependencies = [
  "matrix-sdk",
  "mime",
  "reqwest",
+ "rmp-serde",
  "serde",
  "serde_json",
  "serde_yaml",
