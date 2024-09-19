@@ -376,7 +376,7 @@ async fn match_reaction(
 			let mut queue_file = std::fs::File::options()
 				.create(true)
 				.append(true)
-				.open(&format!("{path}/{queue_chat_id}"))
+				.open(format!("{path}/{queue_chat_id}"))
 				.unwrap();
 			writeln!(
 				&mut queue_file,
