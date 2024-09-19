@@ -17,12 +17,12 @@ use matrix_sdk::{
 };
 
 use crate::db::BridgedMessage;
-use crate::utils::{get_user_name, update_bridged_messages, BM_FILE_PATH, BRIDGES};
+use crate::utils::{get_user_name, update_bridged_messages, Bridge, BRIDGES};
 
-fn find_bm(tg_reply: &Message) -> anyhow::Result<OwnedEventId> {
-	let bm_file_path = &*BM_FILE_PATH;
+fn find_bm(tg_reply: &Message, matrix_chat_id: &str) -> anyhow::Result<OwnedEventId> {
+	let bm_file_path = format!("bridged_messages/{}.mpk", matrix_chat_id);
 	let bridged_messages: Vec<BridgedMessage> =
-		match serde_json::from_reader(File::open(bm_file_path)?) {
+		match rmp_serde::from_read(File::open(bm_file_path)?) {
 			Ok(bm) => bm,
 			Err(e) => bail!("{}", e),
 		};
@@ -49,18 +49,15 @@ pub async fn tg_text_handler(
 	};
 	let text = t_msg.text().unwrap();
 	let to_matrix_text = format!("{}: {text}", user);
-	let mut matrix_chat_id = String::new();
-	for bridge in BRIDGES.iter() {
-		if t_msg.chat.id.0 == bridge.telegram_chat.id {
-			matrix_chat_id = bridge.matrix_chat.id.to_string();
-			break;
-		}
-	}
+	let bridge: &Bridge = BRIDGES
+		.iter()
+		.find(|b| b.telegram_chat.id == t_msg.chat.id.0)
+		.context("chat isn't bridged")?;
 	let matrix_room = matrix_client
-		.get_room(&RoomId::parse(matrix_chat_id)?)
+		.get_room(&RoomId::parse(bridge.matrix_chat.id)?)
 		.unwrap();
 	let message = if let Some(reply) = t_msg.reply_to_message() {
-		let find_bm_result = find_bm(reply);
+		let find_bm_result = find_bm(reply, bridge.matrix_chat.id);
 		if let Ok(matrix_event_id) = find_bm_result {
 			let original_message: OriginalMessageLikeEvent<RoomMessageEventContent> = matrix_room
 				.event(&matrix_event_id)
@@ -80,29 +77,33 @@ pub async fn tg_text_handler(
 		RoomMessageEventContent::text_plain(to_matrix_text)
 	};
 	let sent_mt_msg = matrix_room.send(message).await?;
-	update_bridged_messages(sent_mt_msg.event_id, (t_msg.chat.id, t_msg.id))?;
+	update_bridged_messages(
+		sent_mt_msg.event_id,
+		(t_msg.chat.id, t_msg.id),
+		matrix_room.room_id().as_str(),
+	)?;
 	anyhow::Ok(())
 }
 
 pub async fn tg_file_handler(
-	msg: Message,
+	t_msg: Message,
 	bot: Arc<Bot>,
 	matrix_client: Client,
 ) -> anyhow::Result<()> {
-	let user = match get_user_name(&msg) {
+	let user = match get_user_name(&t_msg) {
 		Ok(user) => user,
 		Err(e) => {
 			eprintln!("{:?}", e);
 			return Ok(());
 		}
 	};
-	let (file_id, content_type) = if let Some(document) = &msg.document() {
+	let (file_id, content_type) = if let Some(document) = &t_msg.document() {
 		(&document.file.id, mime::APPLICATION_OCTET_STREAM)
-	} else if let Some(photo) = &msg.photo() {
+	} else if let Some(photo) = &t_msg.photo() {
 		(&photo.last().unwrap().file.id, mime::IMAGE_JPEG)
-	} else if let Some(animation) = &msg.animation() {
+	} else if let Some(animation) = &t_msg.animation() {
 		(&animation.file.id, "video/mp4".parse::<mime::Mime>()?)
-	} else if let Some(sticker) = &msg.sticker() {
+	} else if let Some(sticker) = &t_msg.sticker() {
 		let content_type = if sticker.is_video() {
 			"video/webm".parse::<mime::Mime>()?
 		} else {
@@ -110,7 +111,7 @@ pub async fn tg_file_handler(
 		};
 		(&sticker.file.id, content_type)
 	} else {
-		eprintln!("unknown message type: {:?}", &msg);
+		eprintln!("unknown message type: {:?}", &t_msg);
 		return Ok(());
 	};
 	let file_path = bot.get_file(file_id).await?.path;
@@ -118,16 +119,13 @@ pub async fn tg_file_handler(
 		"https://api.telegram.org/file/bot{}/{file_path}",
 		bot.token()
 	);
-	let mut matrix_chat_id = String::new();
-	for bridge in BRIDGES.iter() {
-		if msg.chat.id.0 == bridge.telegram_chat.id {
-			matrix_chat_id = bridge.matrix_chat.id.to_string();
-			break;
-		}
-	}
+	let bridge: &Bridge = BRIDGES
+		.iter()
+		.find(|b| b.telegram_chat.id == t_msg.chat.id.0)
+		.context("chat isn't bridged")?;
 	let matrix_room = matrix_client
-		.get_room(&RoomId::parse(matrix_chat_id)?)
-		.context("")?;
+		.get_room(&RoomId::parse(bridge.matrix_chat.id)?)
+		.unwrap();
 	let sender = format!("from {}:", user);
 	let message = RoomMessageEventContent::text_plain(sender);
 	matrix_room.send(message).await?;
@@ -162,9 +160,14 @@ pub async fn tg_file_handler(
 			RoomMessageEventContent::new(MessageType::File(event_content))
 		}
 	};
-	matrix_room.send(file_message).await?;
+	let sent_mt_msg = matrix_room.send(file_message).await?;
+	update_bridged_messages(
+		sent_mt_msg.event_id,
+		(t_msg.chat.id, t_msg.id),
+		matrix_room.room_id().as_str(),
+	)?;
 
-	if let Some(caption) = msg.caption() {
+	if let Some(caption) = t_msg.caption() {
 		let message = RoomMessageEventContent::text_plain(caption);
 		matrix_room.send(message).await?;
 	}

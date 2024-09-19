@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
+use anna_tg_matrix_bridge::matrix_handlers::matrix_photo_tg;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::ruma;
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
 use matrix_sdk::Client;
 
 use ruma::events::{
@@ -20,6 +22,66 @@ use tokio::{
 use anna_tg_matrix_bridge::matrix_handlers::{matrix_file_tg, matrix_text_tg};
 use anna_tg_matrix_bridge::tg_handlers::{tg_file_handler, tg_text_handler};
 use anna_tg_matrix_bridge::utils::{get_matrix_media, get_tg_bot, BRIDGES};
+
+async fn matrix_to_tg(
+	room: matrix_sdk::Room,
+	ev: SyncMessageLikeEvent<RoomMessageEventContent>,
+	message_type: &MessageType,
+	tg_chat_id: i64,
+	bot_to_matrix: Arc<teloxide::Bot>,
+	client: Client,
+) {
+	let matrix_event = ev.as_original().unwrap();
+	if let MessageType::Text(text) = message_type {
+		let text = format!("{}: {}", ev.sender().as_str(), text.body);
+		let disable_preview = false;
+		if let Err(e) = matrix_text_tg(
+			tg_chat_id,
+			text,
+			matrix_event,
+			room,
+			&bot_to_matrix,
+			disable_preview,
+		)
+		.await
+		{
+			eprintln!("{:?}", e);
+		};
+	} else {
+		let Ok(media) = get_matrix_media(client, message_type.clone()).await else {
+			return;
+		};
+		let (media_name, media, message_type) = media;
+		let caption = ev.sender().as_str();
+		if let MessageType::Image(_) = message_type {
+			if let Err(e) = matrix_photo_tg(
+				tg_chat_id,
+				media,
+				media_name,
+				caption,
+				matrix_event,
+				room,
+				&bot_to_matrix,
+			)
+			.await
+			{
+				eprintln!("{:?}", e);
+			};
+		} else if let Err(e) = matrix_file_tg(
+			tg_chat_id,
+			media,
+			media_name,
+			caption,
+			matrix_event,
+			room,
+			&bot_to_matrix,
+		)
+		.await
+		{
+			eprintln!("{:?}", e);
+		};
+	}
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -67,45 +129,23 @@ async fn main() -> anyhow::Result<()> {
 			if ev.sender().as_str() == matrix_client_id {
 				return;
 			}
-			let mut tg_chat_id: i64 = 0;
-			for bridge in BRIDGES.iter() {
-				if room.room_id().as_str() == bridge.matrix_chat.id {
-					tg_chat_id = bridge.telegram_chat.id;
-					break;
-				}
-			}
-			if tg_chat_id == 0 {
+			let Some(bridge) = BRIDGES
+				.iter()
+				.find(|b| b.matrix_chat.id == room.room_id().as_str())
+			else {
 				return;
-			}
+			};
 			if let SyncMessageLikeEvent::Original(original_message) = ev.clone() {
 				let message_type = &original_message.content.msgtype;
-				if let MessageType::Text(text) = message_type {
-					let text = format!("{}: {}", ev.sender().as_str(), text.body);
-					let matrix_event = ev.as_original().unwrap();
-					let disable_preview = false;
-					if let Err(e) = matrix_text_tg(
-						tg_chat_id,
-						text,
-						matrix_event,
-						room,
-						&bot_to_matrix,
-						disable_preview,
-					)
-					.await
-					{
-						eprintln!("{:?}", e);
-					};
-				} else {
-					match get_matrix_media(client, message_type.clone()).await {
-						Ok(media) => {
-							let (media, media_name) = media;
-							let caption = ev.sender().as_str();
-							matrix_file_tg(tg_chat_id, media_name, media, caption, &bot_to_matrix)
-								.await;
-						}
-						Err(e) => eprintln!("{:?}", e),
-					}
-				}
+				matrix_to_tg(
+					room,
+					ev,
+					message_type,
+					bridge.telegram_chat.id,
+					bot_to_matrix,
+					client,
+				)
+				.await;
 			}
 		},
 	);

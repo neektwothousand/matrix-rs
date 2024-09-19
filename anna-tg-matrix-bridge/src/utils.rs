@@ -1,8 +1,4 @@
-use std::{
-	fs::File,
-	path::Path,
-	sync::LazyLock,
-};
+use std::{fs::File, path::Path, sync::LazyLock};
 
 use anyhow::{bail, Context};
 
@@ -16,11 +12,9 @@ use teloxide::{
 	Bot,
 };
 
-use serde_json;
-
 use crate::db::BridgedMessage;
 
-pub type MatrixMedia = (String, Vec<u8>);
+pub type MatrixMedia = (String, Vec<u8>, MessageType);
 
 pub struct MatrixChat<'a> {
 	pub id: &'a str,
@@ -65,7 +59,7 @@ pub static BRIDGES: LazyLock<Vec<Bridge>> = LazyLock::new(|| {
 	]
 });
 
-pub static BM_FILE_PATH: LazyLock<&str> = LazyLock::new(|| "bridged_messages");
+pub static BM_FILE_PATH: LazyLock<&str> = LazyLock::new(|| "bridged_messages/");
 
 pub trait GetMatrixMedia {
 	fn get_media(
@@ -83,25 +77,25 @@ impl GetMatrixMedia for MatrixMedia {
 				};
 				let value = serde_json::to_value(&m)?;
 				let body = value.get("body").context(dbg!("body not found"))?;
-				Ok((body.to_string(), media))
+				Ok((body.to_string(), media, MessageType::File(m)))
 			}
 			MessageType::Image(m) => {
 				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
 					bail!("");
 				};
-				Ok((m.body, media))
+				Ok((m.body.clone(), media, MessageType::Image(m)))
 			}
 			MessageType::Audio(m) => {
 				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
 					bail!("");
 				};
-				Ok((m.body, media))
+				Ok((m.body.clone(), media, MessageType::Audio(m)))
 			}
 			MessageType::Video(m) => {
 				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
 					bail!("");
 				};
-				Ok((m.body, media))
+				Ok((m.body.clone(), media, MessageType::Video(m)))
 			}
 			_ => bail!(""),
 		}
@@ -111,10 +105,12 @@ impl GetMatrixMedia for MatrixMedia {
 pub async fn get_matrix_media(
 	client: Client,
 	message_type: MessageType,
-) -> anyhow::Result<(String, Vec<u8>)> {
-	let media =
-		<(String, Vec<u8>) as GetMatrixMedia>::get_media(client.clone(), message_type.clone())
-			.await?;
+) -> anyhow::Result<(String, Vec<u8>, MessageType)> {
+	let media = <(String, Vec<u8>, MessageType) as GetMatrixMedia>::get_media(
+		client.clone(),
+		message_type.clone(),
+	)
+	.await?;
 	Ok(media)
 }
 
@@ -141,13 +137,14 @@ pub fn get_user_name(msg: &Message) -> anyhow::Result<String> {
 pub fn update_bridged_messages(
 	matrix_event_id: OwnedEventId,
 	telegram_event_id: (ChatId, MessageId),
+	matrix_chat_id: &str,
 ) -> anyhow::Result<()> {
-	let bm_file_path = &*BM_FILE_PATH;
-	if !Path::new(bm_file_path).exists() {
-		File::create_new(bm_file_path)?;
+	let bm_file_path = format!("bridged_messages/{}.mpk", matrix_chat_id);
+	if !Path::new(&bm_file_path).exists() {
+		File::create_new(&bm_file_path)?;
 	}
 	let mut bridged_messages: Vec<BridgedMessage> =
-		match serde_json::from_reader(File::open(bm_file_path)?) {
+		match rmp_serde::decode::from_read(File::open(&bm_file_path)?) {
 			Ok(bm) => bm,
 			Err(e) => {
 				log::debug!("{}:{}:{}", file!(), line!(), e);
@@ -158,6 +155,6 @@ pub fn update_bridged_messages(
 		matrix_id: matrix_event_id,
 		telegram_id: (telegram_event_id.0, telegram_event_id.1),
 	});
-	serde_json::to_writer(&mut File::create(bm_file_path)?, &bridged_messages).unwrap();
+	rmp_serde::encode::write(&mut File::create(bm_file_path)?, &bridged_messages).unwrap();
 	Ok(())
 }
