@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
 		name: String,
 		password: String,
 	}
-	let user: User = serde_yaml::from_reader(std::fs::File::open("anna.yaml").unwrap()).unwrap();
+	let user: User = serde_json::from_reader(std::fs::File::open("anna.json").unwrap()).unwrap();
 
 	let u = matrix_sdk::ruma::UserId::parse(&user.name).unwrap();
 	let client = matrix_sdk::Client::builder()
