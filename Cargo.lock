@@ -103,7 +103,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "anna-tg-matrix-bridge"
+name = "anna-graem"
 version = "0.1.0"
 dependencies = [
  "anyhow",
