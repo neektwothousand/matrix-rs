@@ -274,9 +274,9 @@ pub async fn get_matrix_reply(
 	Ok(reply_message)
 }
 
-pub async fn send_to_tg<'a>(
+pub async fn send_to_tg(
 	to_tg_data: ToTgData,
-	from_mx_data: FromMxData<'a>,
+	from_mx_data: FromMxData<'_>,
 ) -> anyhow::Result<()> {
 	let null_id = -1i32;
 	let matrix_reply = get_matrix_reply(from_mx_data.matrix_event, &from_mx_data.room).await;
