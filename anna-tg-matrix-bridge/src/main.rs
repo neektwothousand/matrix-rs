@@ -1,15 +1,10 @@
 use std::sync::Arc;
 
-use anna_tg_matrix_bridge::matrix_handlers::matrix_photo_tg;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::ruma;
-use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
 use matrix_sdk::Client;
 
-use ruma::events::{
-	room::message::{MessageType, SyncRoomMessageEvent},
-	SyncMessageLikeEvent,
-};
+use ruma::events::{room::message::SyncRoomMessageEvent, SyncMessageLikeEvent};
 
 use serde::{Deserialize, Serialize};
 use teloxide::dispatching::{Dispatcher, UpdateFilterExt};
@@ -19,69 +14,8 @@ use tokio::{
 	io::{AsyncReadExt, AsyncWriteExt},
 };
 
-use anna_tg_matrix_bridge::matrix_handlers::{matrix_file_tg, matrix_text_tg};
 use anna_tg_matrix_bridge::tg_handlers::{tg_file_handler, tg_text_handler};
-use anna_tg_matrix_bridge::utils::{get_matrix_media, get_tg_bot, BRIDGES};
-
-async fn matrix_to_tg(
-	room: matrix_sdk::Room,
-	ev: SyncMessageLikeEvent<RoomMessageEventContent>,
-	message_type: &MessageType,
-	tg_chat_id: i64,
-	bot_to_matrix: Arc<teloxide::Bot>,
-	client: Client,
-) {
-	let matrix_event = ev.as_original().unwrap();
-	if let MessageType::Text(text) = message_type {
-		let text = format!("{}: {}", ev.sender().as_str(), text.body);
-		let disable_preview = false;
-		if let Err(e) = matrix_text_tg(
-			tg_chat_id,
-			text,
-			matrix_event,
-			room,
-			&bot_to_matrix,
-			disable_preview,
-		)
-		.await
-		{
-			eprintln!("{:?}", e);
-		};
-	} else {
-		let Ok(media) = get_matrix_media(client, message_type.clone()).await else {
-			return;
-		};
-		let (media_name, media, message_type) = media;
-		let caption = ev.sender().as_str();
-		if let MessageType::Image(_) = message_type {
-			if let Err(e) = matrix_photo_tg(
-				tg_chat_id,
-				media,
-				media_name,
-				caption,
-				matrix_event,
-				room,
-				&bot_to_matrix,
-			)
-			.await
-			{
-				eprintln!("{:?}", e);
-			};
-		} else if let Err(e) = matrix_file_tg(
-			tg_chat_id,
-			media,
-			media_name,
-			caption,
-			matrix_event,
-			room,
-			&bot_to_matrix,
-		)
-		.await
-		{
-			eprintln!("{:?}", e);
-		};
-	}
-}
+use anna_tg_matrix_bridge::utils::{get_tg_bot, get_to_tg_data, send_to_tg, FromMxData, BRIDGES};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -135,17 +69,19 @@ async fn main() -> anyhow::Result<()> {
 			else {
 				return;
 			};
-			if let SyncMessageLikeEvent::Original(original_message) = ev.clone() {
-				let message_type = &original_message.content.msgtype;
-				matrix_to_tg(
+			if let SyncMessageLikeEvent::Original(_) = ev.clone() {
+				let from_mx_data = FromMxData {
+					matrix_event: ev.as_original().unwrap(),
 					room,
-					ev,
-					message_type,
-					bridge.telegram_chat.id,
-					bot_to_matrix,
-					client,
-				)
-				.await;
+				};
+				let Ok(to_tg_data) =
+					get_to_tg_data(&from_mx_data, bot_to_matrix, client, bridge).await
+				else {
+					return;
+				};
+				if let Err(e) = send_to_tg(to_tg_data, from_mx_data).await {
+					log::error!("{e}");
+				}
 			}
 		},
 	);
