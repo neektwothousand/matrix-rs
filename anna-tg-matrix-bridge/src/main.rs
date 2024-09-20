@@ -14,8 +14,9 @@ use tokio::{
 	io::{AsyncReadExt, AsyncWriteExt},
 };
 
+use anna_tg_matrix_bridge::matrix_handlers::mx_to_tg;
 use anna_tg_matrix_bridge::tg_handlers::{tg_file_handler, tg_text_handler};
-use anna_tg_matrix_bridge::utils::{get_tg_bot, get_to_tg_data, send_to_tg, FromMxData, BRIDGES};
+use anna_tg_matrix_bridge::utils::{get_tg_bot, get_to_tg_data, FromMxData, BRIDGES};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -79,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
 				else {
 					return;
 				};
-				if let Err(e) = send_to_tg(to_tg_data, from_mx_data).await {
+				if let Err(e) = mx_to_tg(to_tg_data, from_mx_data).await {
 					log::error!("{e}");
 				}
 			}

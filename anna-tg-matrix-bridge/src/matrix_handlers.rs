@@ -1,135 +1,70 @@
-use anyhow::bail;
-use matrix_sdk::{
-	ruma::events::{room::message::RoomMessageEventContent, OriginalSyncMessageLikeEvent},
-	Room,
-};
+use anyhow::{bail, Context};
 use teloxide::{
 	payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters},
 	prelude::Requester,
 	types::{InputFile, MessageId},
-	Bot,
 };
 
-use crate::utils::{find_bm, get_matrix_reply, update_bridged_messages};
+use crate::utils::{find_bm, get_matrix_reply, update_bridged_messages, FromMxData, TgMessageKind, ToTgData};
 
-pub async fn matrix_text_tg(
-	tg_chat_id: i64,
-	text: String,
-	matrix_event: &OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
-	room: Room,
-	bot: &Bot,
-	preview: bool,
+pub async fn mx_to_tg(
+	to_tg_data: ToTgData,
+	from_mx_data: FromMxData<'_>,
 ) -> anyhow::Result<()> {
-	let chat_id = teloxide::types::ChatId(tg_chat_id);
-	let matrix_chat_id = room.room_id().to_string();
-	let reply_to_id = if let Ok(matrix_reply) = get_matrix_reply(matrix_event, &room).await {
-		let find_bm_result = find_bm(matrix_reply, &matrix_chat_id);
-		if let Ok(id) = find_bm_result {
-			id
-		} else {
-			log::info!("{:?}", find_bm_result);
-			MessageId(-1i32)
-		}
+	let null_id = -1i32;
+	let matrix_reply = get_matrix_reply(from_mx_data.matrix_event, &from_mx_data.room).await;
+	let matrix_chat_id = from_mx_data.room.room_id().as_str();
+	let reply_to_id = if matrix_reply.is_ok() {
+		let bm = find_bm(matrix_reply?, matrix_chat_id);
+		bm.unwrap_or(MessageId(null_id))
 	} else {
-		MessageId(-1i32)
+		MessageId(null_id)
 	};
-	match bot
-		.send_message(chat_id, text)
-		.reply_to_message_id(reply_to_id)
-		.allow_sending_without_reply(true)
-		.disable_web_page_preview(preview)
-		.await
-	{
-		Ok(t_msg) => {
-			update_bridged_messages(
-				matrix_event.event_id.clone(),
-				(t_msg.chat.id, t_msg.id),
-				&matrix_chat_id,
-			)?;
+	let file_name = to_tg_data.file_name.unwrap_or("unknown".to_string());
+	let t_msg: teloxide::types::Message = match to_tg_data.tg_message_kind {
+		Some(TgMessageKind::Text) => {
+			to_tg_data
+				.bot
+				.context("bot not found")?
+				.send_message(
+					to_tg_data.chat_id.context("chat_id not found")?,
+					String::from_utf8_lossy(&to_tg_data.message),
+				)
+				.reply_to_message_id(reply_to_id)
+				.allow_sending_without_reply(true)
+				.disable_web_page_preview(to_tg_data.preview)
+				.await?
 		}
-		Err(e) => bail!("{:?}", e),
+		Some(TgMessageKind::Photo) => {
+			to_tg_data
+				.bot
+				.context("bot not found")?
+				.send_photo(
+					to_tg_data.chat_id.context("chat_id not found")?,
+					InputFile::memory(to_tg_data.message).file_name(file_name),
+				)
+				.reply_to_message_id(reply_to_id)
+				.allow_sending_without_reply(true)
+				.await?
+		}
+		Some(TgMessageKind::Document) => {
+			to_tg_data
+				.bot
+				.context("bot not found")?
+				.send_document(
+					to_tg_data.chat_id.context("chat_id not found")?,
+					InputFile::memory(to_tg_data.message).file_name(file_name),
+				)
+				.reply_to_message_id(reply_to_id)
+				.allow_sending_without_reply(true)
+				.await?
+		}
+		_ => bail!(""),
 	};
-	Ok(())
-}
-
-pub async fn matrix_photo_tg(
-	tg_chat_id: i64,
-	photo: Vec<u8>,
-	file_name: String,
-	caption: &str,
-	matrix_event: &OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
-	room: Room,
-	bot: &Bot,
-) -> anyhow::Result<()> {
-	let chat_id = teloxide::types::ChatId(tg_chat_id);
-	let matrix_chat_id = room.room_id().to_string();
-	let reply_to_id = if let Ok(matrix_reply) = get_matrix_reply(matrix_event, &room).await {
-		let find_bm_result = find_bm(matrix_reply, &matrix_chat_id);
-		if let Ok(id) = find_bm_result {
-			id
-		} else {
-			log::info!("{:?}", find_bm_result);
-			MessageId(-1i32)
-		}
-	} else {
-		MessageId(-1i32)
-	};
-	match bot
-		.send_photo(chat_id, InputFile::memory(photo).file_name(file_name))
-		.reply_to_message_id(reply_to_id)
-		.allow_sending_without_reply(true)
-		.caption(caption)
-		.await
-	{
-		Ok(t_msg) => {
-			update_bridged_messages(
-				matrix_event.event_id.clone(),
-				(t_msg.chat.id, t_msg.id),
-				&matrix_chat_id,
-			)?;
-		}
-		Err(e) => bail!("{:?}", e),
-	}
-	Ok(())
-}
-
-pub async fn matrix_file_tg(
-	tg_chat_id: i64,
-	file: Vec<u8>,
-	file_name: String,
-	caption: &str,
-	matrix_event: &OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
-	room: Room,
-	bot: &Bot,
-) -> anyhow::Result<()> {
-	let chat_id = teloxide::types::ChatId(tg_chat_id);
-	let matrix_chat_id = room.room_id().to_string();
-	let reply_to_id = if let Ok(matrix_reply) = get_matrix_reply(matrix_event, &room).await {
-		let find_bm_result = find_bm(matrix_reply, &matrix_chat_id);
-		if let Ok(id) = find_bm_result {
-			id
-		} else {
-			log::info!("{:?}", find_bm_result);
-			MessageId(-1i32)
-		}
-	} else {
-		MessageId(-1i32)
-	};
-	match bot
-		.send_document(chat_id, InputFile::memory(file).file_name(file_name))
-		.reply_to_message_id(reply_to_id)
-		.allow_sending_without_reply(true)
-		.caption(caption)
-		.await
-	{
-		Ok(t_msg) => {
-			update_bridged_messages(
-				matrix_event.event_id.clone(),
-				(t_msg.chat.id, t_msg.id),
-				&matrix_chat_id,
-			)?;
-		}
-		Err(e) => bail!("{:?}", e),
-	}
+	update_bridged_messages(
+		from_mx_data.matrix_event.event_id.clone(),
+		(t_msg.chat.id, t_msg.id),
+		matrix_chat_id,
+	)?;
 	Ok(())
 }
