@@ -1,4 +1,5 @@
 *.yaml
+*.json
 *sqlite_store
 *device_id
 murmur.log
