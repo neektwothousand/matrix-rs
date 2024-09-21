@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anna_graem::tg_handlers::tg_to_mx;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::ruma;
 use matrix_sdk::Client;
@@ -15,8 +16,7 @@ use tokio::{
 };
 
 use anna_graem::matrix_handlers::mx_to_tg;
-use anna_graem::tg_handlers::{tg_file_handler, tg_text_handler};
-use anna_graem::utils::{get_tg_bot, get_to_tg_data, FromMxData, BRIDGES};
+use anna_graem::utils::{get_tg_bot, get_to_tg_data, BmMxData, BRIDGES};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -71,9 +71,11 @@ async fn main() -> anyhow::Result<()> {
 				return;
 			};
 			if let SyncMessageLikeEvent::Original(_) = ev.clone() {
-				let from_mx_data = FromMxData {
-					matrix_event: ev.as_original().unwrap(),
+				let original_ev = ev.as_original().unwrap();
+				let from_mx_data = BmMxData {
+					mx_event: original_ev,
 					room,
+					mx_msg_type: &original_ev.content.msgtype,
 				};
 				let Ok(to_tg_data) =
 					get_to_tg_data(&from_mx_data, bot_to_matrix, client, bridge).await
@@ -87,12 +89,8 @@ async fn main() -> anyhow::Result<()> {
 		},
 	);
 	tokio::spawn(async move {
-		let tg_update_handler = teloxide::types::Update::filter_message()
-			.branch(
-				teloxide::dptree::filter(|msg: teloxide::types::Message| msg.text().is_some())
-					.endpoint(tg_text_handler),
-			)
-			.branch(teloxide::dptree::endpoint(tg_file_handler));
+		let tg_update_handler =
+			teloxide::types::Update::filter_message().branch(teloxide::dptree::endpoint(tg_to_mx));
 		Dispatcher::builder(bot, tg_update_handler)
 			.dependencies(teloxide::dptree::deps![client])
 			.build()

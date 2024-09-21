@@ -48,7 +48,7 @@ pub enum TgMessageKind {
 	Document,
 }
 #[derive(Default)]
-pub struct ToTgData {
+pub struct BmTgData {
 	pub bot: Option<Arc<Bot>>,
 	pub chat_id: Option<ChatId>,
 	pub message: Vec<u8>,
@@ -56,8 +56,9 @@ pub struct ToTgData {
 	pub file_name: Option<String>,
 	pub preview: bool,
 }
-pub struct FromMxData<'a> {
-	pub matrix_event: &'a OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
+pub struct BmMxData<'a> {
+	pub mx_event: &'a OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
+	pub mx_msg_type: &'a MessageType,
 	pub room: Room,
 }
 
@@ -207,17 +208,17 @@ pub fn find_bm(reply: AnyMessageLikeEvent, mx_chat: &str) -> anyhow::Result<Mess
 }
 
 pub async fn get_to_tg_data<'a>(
-	from_mx_data: &FromMxData<'a>,
+	from_mx_data: &BmMxData<'a>,
 	bot: Arc<Bot>,
 	client: Client,
 	bridge: &Bridge<'a>,
-) -> anyhow::Result<ToTgData> {
-	let mut tg_data = ToTgData {
+) -> anyhow::Result<BmTgData> {
+	let mut tg_data = BmTgData {
 		bot: Some(bot),
 		chat_id: Some(ChatId(bridge.telegram_chat.id)),
 		..Default::default()
 	};
-	let message_type = &from_mx_data.matrix_event.content.msgtype;
+	let message_type = &from_mx_data.mx_event.content.msgtype;
 	match message_type {
 		MessageType::Text(t) => {
 			tg_data.message = t.body.as_bytes().to_vec();
@@ -272,4 +273,3 @@ pub async fn get_matrix_reply(
 
 	Ok(reply_message)
 }
-
