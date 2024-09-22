@@ -26,13 +26,18 @@ fn find_bm(tg_reply: &Message, matrix_chat_id: &str) -> anyhow::Result<OwnedEven
 	let bridged_messages: Vec<BridgedMessage> =
 		match rmp_serde::from_read(File::open(bm_file_path)?) {
 			Ok(bm) => bm,
-			Err(e) => bail!("{}", e),
+			Err(e) => {
+				log::error!("{}:{}", line!(), e);
+				bail!("");
+			}
 		};
 	let Some(bridged_message) = bridged_messages
 		.iter()
 		.find(|t| t.telegram_id == (tg_reply.chat.id, tg_reply.id))
 	else {
-		bail!("message not found");
+		let e = "message not found";
+		log::error!("{}:{}", line!(), e);
+		bail!("");
 	};
 	Ok(bridged_message.matrix_id.clone())
 }
@@ -73,7 +78,11 @@ pub async fn tg_to_mx(msg: Message, bot: Arc<Bot>, client: Client) -> anyhow::Re
 	let matrix_room = client
 		.get_room(&RoomId::parse(bridge.matrix_chat.id)?)
 		.unwrap();
-	let reply_to_message = get_reply_to_message(&msg, &matrix_room).await;
+	let reply_to_message = if let Some(msg) = &msg_common.reply_to_message {
+		get_reply_to_message(&msg, &matrix_room).await
+	} else {
+		None
+	};
 
 	let tg_file: Option<(String, mime::Mime)> = match msg_common.media_kind {
 		MediaKind::Photo(ref m) => {
