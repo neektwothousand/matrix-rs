@@ -158,6 +158,9 @@ pub async fn tg_to_mx(msg: Message, bot: Arc<Bot>, client: Client) -> anyhow::Re
 				}
 			}
 			MediaKind::Photo(_) | MediaKind::Sticker(_) => {
+				let text = format!("from {}:", user);
+				let text_plain = RoomMessageEventContent::text_plain(text);
+				matrix_room.send(text_plain).await?;
 				if tg_file.unwrap().1.type_() == "video" {
 					let event_content = VideoMessageEventContent::new(
 						"tg_video".to_string(),
@@ -183,6 +186,9 @@ pub async fn tg_to_mx(msg: Message, bot: Arc<Bot>, client: Client) -> anyhow::Re
 				}
 			}
 			MediaKind::Animation(_) | MediaKind::Video(_) => {
+				let text = format!("from {}:", user);
+				let text_plain = RoomMessageEventContent::text_plain(text);
+				matrix_room.send(text_plain).await?;
 				let event_content = VideoMessageEventContent::new(
 					"tg_video".to_string(),
 					MediaSource::Plain(mxc_uri.unwrap()),
@@ -198,6 +204,9 @@ pub async fn tg_to_mx(msg: Message, bot: Arc<Bot>, client: Client) -> anyhow::Re
 				}
 			}
 			MediaKind::Document(_) => {
+				let text = format!("from {}:", user);
+				let text_plain = RoomMessageEventContent::text_plain(text);
+				matrix_room.send(text_plain).await?;
 				let event_content = VideoMessageEventContent::new(
 					"tg_document".to_string(),
 					MediaSource::Plain(mxc_uri.unwrap()),
