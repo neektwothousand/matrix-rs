@@ -1,11 +1,12 @@
-use std::sync::Arc;
-use ruma::events::{room::message::SyncRoomMessageEvent, SyncMessageLikeEvent};
-use matrix_sdk::{
-	config::SyncSettings,
-	ruma,
-	Client,
+use anna_graem::{
+	matrix_handlers::mx_to_tg,
+	tg_handlers::tg_to_mx,
+	utils::{get_tg_bot, get_tg_webhook_link, get_to_tg_data, BmMxData, BRIDGES},
 };
+use matrix_sdk::{config::SyncSettings, ruma, Client};
+use ruma::events::{room::message::SyncRoomMessageEvent, SyncMessageLikeEvent};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use teloxide::{
 	dispatching::{Dispatcher, UpdateFilterExt},
 	update_listeners::webhooks,
@@ -14,16 +15,11 @@ use tokio::{
 	fs::File,
 	io::{AsyncReadExt, AsyncWriteExt},
 };
-use anna_graem::{
-	tg_handlers::tg_to_mx,
-	matrix_handlers::mx_to_tg,
-	utils::{get_tg_bot, get_tg_webhook_link, get_to_tg_data, BmMxData, BRIDGES},
-};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	simple_logger::SimpleLogger::new().env().init().unwrap();
-	
+
 	let bot = Arc::new(get_tg_bot().await);
 	let url = url::Url::parse(&get_tg_webhook_link(bot.token()))?;
 	let addr = ([0, 0, 0, 0], 8443).into();
@@ -43,7 +39,6 @@ async fn main() -> anyhow::Result<()> {
 		.build()
 		.await
 		.unwrap();
-	
 
 	let bot_to_matrix = Arc::clone(&bot);
 	let matrix_client = client.clone();

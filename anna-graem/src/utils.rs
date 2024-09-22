@@ -198,17 +198,43 @@ pub fn update_bridged_messages(
 	Ok(())
 }
 
-pub fn find_bm(reply: AnyMessageLikeEvent, mx_chat: &str) -> anyhow::Result<MessageId> {
-	let id = EventId::parse(reply.event_id())?;
+fn get_bms(mx_chat: &str) -> Option<Vec<BridgedMessage>> {
 	let bm_file_path = format!("bridged_messages/{}.mpk", mx_chat);
-	let bms: Vec<BridgedMessage> = match rmp_serde::decode::from_read(File::open(bm_file_path)?) {
-		Ok(bms) => bms,
-		Err(e) => bail!("{}", e),
+	let file = match File::open(bm_file_path) {
+		Ok(f) => f,
+		Err(e) => {
+			log::error!("{}:{}", line!(), e);
+			return None;
+		}
 	};
-	let Some(bm) = bms.iter().find(|bm| bm.matrix_id == id) else {
-		bail!("message not found");
+	match rmp_serde::from_read(file) {
+		Ok(bms) => Some(bms),
+		Err(e) => {
+			log::error!("{}:{}", line!(), e);
+			None
+		}
+	}
+}
+
+pub fn find_mx_event_id(tg_reply: &Message, mx_chat: &str) -> Option<OwnedEventId> {
+	let bms = get_bms(mx_chat)?;
+	let bm = bms
+		.iter()
+		.find(|t| t.telegram_id == (tg_reply.chat.id, tg_reply.id))?;
+	Some(bm.matrix_id.clone())
+}
+
+pub fn find_tg_msg_id(reply: AnyMessageLikeEvent, mx_chat: &str) -> Option<MessageId> {
+	let bms = get_bms(mx_chat)?;
+	let id = match EventId::parse(reply.event_id()) {
+		Ok(id) => id,
+		Err(e) => {
+			log::error!("{}:{}", line!(), e);
+			return None;
+		}
 	};
-	Ok(bm.telegram_id.1)
+	let bm = bms.iter().find(|bm| bm.matrix_id == id)?;
+	Some(bm.telegram_id.1)
 }
 
 pub async fn get_to_tg_data<'a>(

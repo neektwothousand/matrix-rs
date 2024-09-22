@@ -6,7 +6,7 @@ use teloxide::{
 };
 
 use crate::utils::{
-	find_bm, get_matrix_reply, update_bridged_messages, BmMxData, BmTgData, TgMessageKind,
+	find_tg_msg_id, get_matrix_reply, update_bridged_messages, BmMxData, BmTgData, TgMessageKind,
 };
 
 pub async fn mx_to_tg(to_tg_data: BmTgData, from_mx_data: BmMxData<'_>) -> anyhow::Result<()> {
@@ -14,7 +14,7 @@ pub async fn mx_to_tg(to_tg_data: BmTgData, from_mx_data: BmMxData<'_>) -> anyho
 	let matrix_reply = get_matrix_reply(from_mx_data.mx_event, &from_mx_data.room).await;
 	let matrix_chat_id = from_mx_data.room.room_id().as_str();
 	let reply_to_id = if matrix_reply.is_ok() {
-		find_bm(matrix_reply?, matrix_chat_id).unwrap_or(MessageId(null_id))
+		find_tg_msg_id(matrix_reply?, matrix_chat_id).unwrap_or(MessageId(null_id))
 	} else {
 		MessageId(null_id)
 	};

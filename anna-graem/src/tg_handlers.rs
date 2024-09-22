@@ -1,4 +1,3 @@
-use std::fs::File;
 use std::sync::Arc;
 
 use anyhow::{bail, Context};
@@ -8,7 +7,6 @@ use matrix_sdk::ruma::events::room::message::{
 };
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::OriginalMessageLikeEvent;
-use matrix_sdk::ruma::OwnedEventId;
 use teloxide::types::{MediaKind, MessageKind};
 use teloxide::Bot;
 use teloxide::{prelude::Requester, types::Message};
@@ -18,29 +16,7 @@ use matrix_sdk::{
 	Client, Room,
 };
 
-use crate::db::BridgedMessage;
-use crate::utils::{get_user_name, update_bridged_messages, Bridge, BRIDGES};
-
-fn find_bm(tg_reply: &Message, matrix_chat_id: &str) -> anyhow::Result<OwnedEventId> {
-	let bm_file_path = format!("bridged_messages/{}.mpk", matrix_chat_id);
-	let bridged_messages: Vec<BridgedMessage> =
-		match rmp_serde::from_read(File::open(bm_file_path)?) {
-			Ok(bm) => bm,
-			Err(e) => {
-				log::error!("{}:{}", line!(), e);
-				bail!("");
-			}
-		};
-	let Some(bridged_message) = bridged_messages
-		.iter()
-		.find(|t| t.telegram_id == (tg_reply.chat.id, tg_reply.id))
-	else {
-		let e = "message not found";
-		log::error!("{}:{}", line!(), e);
-		bail!("");
-	};
-	Ok(bridged_message.matrix_id.clone())
-}
+use crate::utils::{find_mx_event_id, get_user_name, update_bridged_messages, Bridge, BRIDGES};
 
 async fn get_reply_to_message<'a>(
 	msg: &Message,
@@ -48,9 +24,7 @@ async fn get_reply_to_message<'a>(
 ) -> Option<OriginalMessageLikeEvent<RoomMessageEventContent>> {
 	use matrix_sdk::ruma::events::AnyMessageLikeEvent;
 	use matrix_sdk::ruma::events::AnyTimelineEvent;
-	let Ok(event_id) = find_bm(msg, matrix_room.room_id().as_str()) else {
-		return None;
-	};
+	let event_id = find_mx_event_id(msg, matrix_room.room_id().as_str())?;
 
 	let raw_ev = matrix_room.event(&event_id).await.ok()?.event;
 	let ev = match raw_ev.deserialize_as::<AnyTimelineEvent>().ok()? {
