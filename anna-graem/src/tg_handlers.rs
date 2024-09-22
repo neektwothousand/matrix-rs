@@ -53,7 +53,7 @@ pub async fn tg_to_mx(msg: Message, bot: Arc<Bot>, client: Client) -> anyhow::Re
 		.get_room(&RoomId::parse(bridge.matrix_chat.id)?)
 		.unwrap();
 	let reply_to_message = if let Some(msg) = &msg_common.reply_to_message {
-		get_reply_to_message(&msg, &matrix_room).await
+		get_reply_to_message(msg, &matrix_room).await
 	} else {
 		None
 	};
