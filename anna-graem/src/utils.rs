@@ -154,6 +154,10 @@ pub async fn get_tg_bot() -> teloxide::Bot {
 	Bot::new(token)
 }
 
+pub fn get_tg_webhook_link(token: &str) -> String {
+	format!("https://archneek.me/{token}")
+}
+
 pub fn get_user_name(msg: &Message) -> anyhow::Result<String> {
 	let name = if let Some(chat) = msg.sender_chat() {
 		if chat.is_channel() {

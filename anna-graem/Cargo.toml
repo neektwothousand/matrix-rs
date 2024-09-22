@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-teloxide = { version = "0.12.2", default-features = false, features = ["ctrlc_handler", "rustls"] }
-mime = "0.3.17"
-url = "2.5.2"
-simple_logger = "5.0.0"
-log = "0.4.22"
-rmp-serde = "1.3.0"
+teloxide = { version = "0.12.2", default-features = false, features = ["ctrlc_handler", "rustls", "webhooks", "webhooks-axum"] }
+mime = { version = "0.3.17", default-features = false }
+url = { version = "2.5.2", default-features = false }
+simple_logger = { version = "5.0.0", default-features = false }
+log = { version = "0.4.22", default-features = false }
+rmp-serde = { version = "1.3.0", default-features = false }
 
 matrix-sdk.workspace = true
 tokio.workspace = true
