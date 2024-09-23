@@ -103,6 +103,8 @@ async fn main() -> anyhow::Result<()> {
 	});
 	if matrix_client.user_id().is_some() {
 		log::info!("matrix client logged in");
+	} else {
+		anyhow::bail!("matrix client can't log in");
 	}
 	log::info!("tg dispatched");
 	loop {
