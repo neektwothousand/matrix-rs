@@ -81,8 +81,7 @@ async fn socket_handler(room: Room) {
 async fn anilist_update(room: &Room) -> Result<(), anyhow::Error> {
 	let reqwest_client = reqwest::Client::builder()
 		.user_agent("deal-lilim")
-		.build()
-		.unwrap();
+		.build()?;
 	let user_ids = [5752916, 6832539];
 	for user_id in user_ids {
 		let file_name = format!("anilist_{user_id}_createdAt");
