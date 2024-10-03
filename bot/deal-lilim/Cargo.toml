@@ -1,0 +1,19 @@
+[package]
+name = "deal-lilim"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+utils.workspace = true
+tg-matrix-bridge.workspace = true
+interactive.workspace = true
+
+matrix-sdk.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+simple_logger.workspace = true
