@@ -24,26 +24,10 @@ pub async fn send(room: Room, content: RoomMessageEventContent) -> anyhow::Resul
 	loop {
 		match room.send(content.clone()).await {
 			Ok(response) => return Ok(response),
-			Err(e) => {
-				let err = e.as_ruma_api_error().unwrap();
+			Err(err) => {
 				match err {
-					matrix_sdk::RumaApiError::Uiaa(uiaa) => {
-						bail!("{:?}", uiaa.auth_error);
-					}
-					matrix_sdk::RumaApiError::Other(other) => {
-						if other.status_code == StatusCode::REQUEST_TIMEOUT {
-							continue;
-						} else {
-							bail!("{:?}", other);
-						}
-					}
-					matrix_sdk::RumaApiError::ClientApi(c_api) => {
-						if c_api.status_code == StatusCode::REQUEST_TIMEOUT {
-							continue;
-						} else {
-							bail!("{:?}", c_api);
-						}
-					}
+					matrix_sdk::Error::Http(_) => continue,
+					_ => bail!("{:?}", err),
 				}
 			}
 		}
