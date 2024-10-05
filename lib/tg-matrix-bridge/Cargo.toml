@@ -16,5 +16,4 @@ serde.workspace = true
 serde_json.workspace = true
 reqwest.workspace = true
 anyhow.workspace = true
-simple_logger.workspace = true
 utils.workspace = true

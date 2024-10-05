@@ -11,9 +11,9 @@ tg-matrix-bridge.workspace = true
 interactive.workspace = true
 
 matrix-sdk.workspace = true
-reqwest.workspace = true
 tokio.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 simple_logger.workspace = true
+log.workspace = true
