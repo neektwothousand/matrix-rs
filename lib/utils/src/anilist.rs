@@ -54,7 +54,7 @@ async fn send_update(room: &Room, user_ids: &Vec<u64>) -> anyhow::Result<()> {
 		let response = match reqwest_client.execute(request).await {
 			Ok(r) => r,
 			Err(e) => {
-				eprintln!("{:?}", e);
+				log::error!("{:?}", e);
 				return Err(anyhow::anyhow!(e.to_string()));
 			}
 		};

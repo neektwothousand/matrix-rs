@@ -1,6 +1,5 @@
 use anyhow::bail;
 use matrix_sdk::matrix_auth::LoginBuilder;
-use matrix_sdk::reqwest::StatusCode;
 use matrix_sdk::ruma::api::client::message::send_message_event::v3::Response;
 use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
 use matrix_sdk::Room;

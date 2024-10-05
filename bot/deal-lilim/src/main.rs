@@ -111,7 +111,7 @@ async fn main() -> anyhow::Result<()> {
 	loop {
 		let client_sync = client.sync(SyncSettings::default()).await;
 		if let Err(ref e) = client_sync {
-			eprintln!("{:?}", e);
+			log::error!("{:?}", e);
 		}
 	}
 }
