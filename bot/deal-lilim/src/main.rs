@@ -7,6 +7,7 @@ use matrix_sdk::ruma::RoomId;
 use matrix_sdk::{config::SyncSettings, ruma, Client, Room};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::io::Write;
 
 #[derive(Serialize, Deserialize)]
 struct User {
@@ -18,10 +19,19 @@ struct User {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-	simple_logger::SimpleLogger::new()
-		.env()
-		.with_utc_timestamps()
-		.init()?;
+	env_logger::Builder::new()
+		.format(|buf, record| {
+			writeln!(
+				buf,
+				"{}:{} - [{}] {}",
+				record.file().unwrap_or("unknown"),
+				record.line().unwrap_or(0),
+				record.level(),
+				record.args()
+			)
+		})
+		.format_timestamp_secs()
+		.init();
 
 	let user: User = serde_json::from_reader(std::fs::File::open("bot_login_data.json")?)?;
 
@@ -97,6 +107,7 @@ async fn main() -> anyhow::Result<()> {
 		},
 	);
 
+	log::info!("bot started");
 	loop {
 		let client_sync = client.sync(SyncSettings::default()).await;
 		if let Err(ref e) = client_sync {

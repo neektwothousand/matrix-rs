@@ -24,7 +24,7 @@ use matrix_sdk::{
 use teloxide::{
 	adaptors::{throttle::Limits, Throttle},
 	payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters},
-	prelude::Requester,
+	prelude::{Requester, RequesterExt},
 	types::{ChatId, InputFile, LinkPreviewOptions, Message, MessageId, ReplyParameters},
 	Bot, RequestError,
 };
@@ -154,9 +154,7 @@ pub async fn get_matrix_media(
 
 pub async fn get_tg_bot() -> Throttle<teloxide::Bot> {
 	let token = std::fs::read_to_string("tg_token").unwrap();
-	let (bot, worker) = Throttle::new(Bot::new(token), Limits::default());
-	tokio::spawn(worker);
-	bot
+	Bot::new(token).throttle(Limits::default())
 }
 
 pub fn get_tg_webhook_link(token: &str) -> String {

@@ -65,11 +65,16 @@ async fn read_sock(room: Arc<Room>, socket: &str) -> anyhow::Result<()> {
 pub async fn socket_handler(room: Arc<Room>) {
 	let sockets = [DIS_SOCK, MUR_SOCK];
 
+	let mut thread_handles = vec![];
 	for socket in sockets {
 		if Path::new(socket).exists() {
 			fs::remove_file(socket).unwrap();
 		}
 		let room = room.clone();
-		std::thread::spawn(move || async move { read_sock(room, socket).await });
+		thread_handles.push(read_sock(room, socket));
 	}
+	let s1 = thread_handles.pop().unwrap().await;
+	log::error!("{:?}", s1);
+	let s2 = thread_handles.pop().unwrap().await;
+	log::error!("{:?}", s2);
 }

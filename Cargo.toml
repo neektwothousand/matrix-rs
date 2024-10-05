@@ -13,5 +13,5 @@ reqwest = { version = "0.12.8", default-features = false, features = ["json", "r
 tokio = { version = "1.40.0", default-features = false, features = ["rt", "rt-multi-thread"] }
 serde_json = { version = "1.0.128", default-features = false }
 serde = { version = "1.0.210", default-features = false, features = ["derive"] }
-simple_logger = { version = "5.0.0", default-features = true }
+env_logger = { version = "0.11.5", default-features = true }
 log = { version = "0.4.22", default-features = true }

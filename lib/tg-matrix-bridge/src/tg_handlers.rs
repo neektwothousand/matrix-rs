@@ -7,6 +7,7 @@ use matrix_sdk::ruma::events::room::message::{
 };
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::OriginalMessageLikeEvent;
+use teloxide::adaptors::Throttle;
 use teloxide::types::{MediaKind, MessageKind};
 use teloxide::Bot;
 use teloxide::{prelude::Requester, types::Message};
@@ -41,8 +42,9 @@ async fn get_reply_to_message<'a>(
 	msg_like_event.as_original().cloned()
 }
 
-pub async fn tg_to_mx(msg: Message, bot: Arc<Bot>, client: Arc<Client>) -> anyhow::Result<()> {
+pub async fn tg_to_mx(msg: Message, bot: Arc<Throttle<Bot>>, client: Arc<Client>) -> anyhow::Result<()> {
 	let user = get_user_name(&msg)?;
+	let bot = <Throttle<Bot> as Clone>::clone(&bot).into_inner();
 	let MessageKind::Common(ref msg_common) = msg.kind else {
 		bail!("");
 	};
