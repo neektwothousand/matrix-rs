@@ -22,8 +22,11 @@ use matrix_sdk::{
 };
 
 use teloxide::{
-	types::{ChatId, Message, MessageId},
-	Bot,
+	adaptors::{throttle::Limits, Throttle},
+	payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters},
+	prelude::Requester,
+	types::{ChatId, InputFile, LinkPreviewOptions, Message, MessageId, ReplyParameters},
+	Bot, RequestError,
 };
 
 use crate::db::BridgedMessage;
@@ -49,7 +52,7 @@ pub enum TgMessageKind {
 }
 #[derive(Default)]
 pub struct BmTgData {
-	pub bot: Option<Arc<Bot>>,
+	pub bot: Option<Arc<Throttle<Bot>>>,
 	pub chat_id: Option<ChatId>,
 	pub message: Vec<u8>,
 	pub tg_message_kind: Option<TgMessageKind>,
@@ -149,9 +152,11 @@ pub async fn get_matrix_media(
 	Ok(media)
 }
 
-pub async fn get_tg_bot() -> teloxide::Bot {
+pub async fn get_tg_bot() -> Throttle<teloxide::Bot> {
 	let token = std::fs::read_to_string("tg_token").unwrap();
-	Bot::new(token)
+	let (bot, worker) = Throttle::new(Bot::new(token), Limits::default());
+	tokio::spawn(worker);
+	bot
 }
 
 pub fn get_tg_webhook_link(token: &str) -> String {
@@ -239,7 +244,7 @@ pub fn find_tg_msg_id(reply: AnyMessageLikeEvent, mx_chat: &str) -> Option<Messa
 
 pub async fn get_to_tg_data<'a>(
 	from_mx_data: &BmMxData<'a>,
-	bot: Arc<Bot>,
+	bot: Arc<Throttle<Bot>>,
 	client: Client,
 	bridge: &Bridge<'a>,
 ) -> anyhow::Result<BmTgData> {
@@ -302,4 +307,63 @@ pub async fn get_matrix_reply(
 	};
 
 	Ok(reply_message)
+}
+
+pub async fn bot_send_request(
+	bot: Arc<Throttle<Bot>>,
+	to_tg_data: BmTgData,
+	chat_id: ChatId,
+	reply_params: ReplyParameters,
+	link_preview: LinkPreviewOptions,
+	from_user: String,
+) -> anyhow::Result<Message> {
+	let file_name = to_tg_data.file_name.unwrap_or("unknown".to_string());
+	loop {
+		let res = match to_tg_data.tg_message_kind {
+			Some(TgMessageKind::Text) => {
+				let text = format!(
+					"{from_user}: {}",
+					String::from_utf8_lossy(&to_tg_data.message.clone())
+				);
+				bot.send_message(chat_id, text)
+					.reply_parameters(reply_params.clone())
+					.link_preview_options(link_preview.clone())
+					.await
+			}
+			Some(TgMessageKind::Photo) => {
+				let photo =
+					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
+				bot.send_photo(chat_id, photo)
+					.caption(from_user.clone())
+					.reply_parameters(reply_params.clone())
+					.await
+			}
+			Some(TgMessageKind::Document) => {
+				let document =
+					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
+				bot.send_document(chat_id, document)
+					.caption(from_user.clone())
+					.reply_parameters(reply_params.clone())
+					.await
+			}
+			_ => bail!(""),
+		};
+		match res {
+			Ok(message) => return Ok(message),
+			Err(e) => match e {
+				RequestError::Network(e) => {
+					if e.is_timeout() {
+						continue;
+					} else {
+						bail!("{:?}", e);
+					}
+				}
+				RequestError::Io(e) => bail!("{:?}", e),
+				RequestError::InvalidJson { source, raw } => bail!("{:?} {:?}", source, raw),
+				RequestError::Api(e) => bail!("{:?}", e),
+				RequestError::MigrateToChatId(e) => bail!("{:?}", e),
+				RequestError::RetryAfter(e) => bail!("{:?}", e),
+			},
+		}
+	}
 }

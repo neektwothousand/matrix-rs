@@ -1,32 +1,37 @@
-use crate::utils::{get_tg_bot, get_tg_webhook_link, get_to_tg_data, BmMxData, BRIDGES};
+use crate::bridge_utils::{get_tg_bot, get_tg_webhook_link, get_to_tg_data, BmMxData, BRIDGES};
 use std::sync::Arc;
-use teloxide::update_listeners::webhooks;
 
 use crate::matrix_handlers::mx_to_tg;
 use crate::tg_handlers::tg_to_mx;
 use matrix_sdk::ruma::events::room::message::SyncRoomMessageEvent;
 use matrix_sdk::ruma::events::SyncMessageLikeEvent;
 use matrix_sdk::Client;
-use teloxide::dispatching::{Dispatcher, UpdateFilterExt};
 
+use teloxide::adaptors::Throttle;
+use teloxide::dispatching::{Dispatcher, UpdateFilterExt};
+use teloxide::update_listeners::webhooks;
+use teloxide::Bot;
+
+pub mod bridge_utils;
 pub mod db;
 pub mod matrix_handlers;
 pub mod tg_handlers;
-pub mod utils;
 
 pub async fn dispatch(client: Arc<Client>) {
 	let bot = Arc::new(get_tg_bot().await);
-	let url = url::Url::parse(&get_tg_webhook_link(bot.token())).unwrap();
+	let url = url::Url::parse(&get_tg_webhook_link(
+		<Throttle<Bot> as Clone>::clone(&bot).into_inner().token(),
+	))
+	.unwrap();
 	let addr = ([0, 0, 0, 0], 8443).into();
 	let listener = webhooks::axum(bot.clone(), webhooks::Options::new(addr, url))
 		.await
 		.unwrap();
 
 	let bot_to_matrix = Arc::clone(&bot);
-	let matrix_client_id = client.user_id().unwrap().to_string();
 	client.add_event_handler(
 		|ev: SyncRoomMessageEvent, room: matrix_sdk::Room, client: Client| async move {
-			if ev.sender().as_str() == matrix_client_id {
+			if ev.sender().as_str() == client.user_id().unwrap().as_str() {
 				return;
 			}
 			let Some(bridge) = BRIDGES

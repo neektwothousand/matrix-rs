@@ -16,7 +16,9 @@ use matrix_sdk::{
 	Client, Room,
 };
 
-use crate::utils::{find_mx_event_id, get_user_name, update_bridged_messages, Bridge, BRIDGES};
+use crate::bridge_utils::{
+	find_mx_event_id, get_user_name, update_bridged_messages, Bridge, BRIDGES,
+};
 
 async fn get_reply_to_message<'a>(
 	msg: &Message,
@@ -197,7 +199,7 @@ pub async fn tg_to_mx(msg: Message, bot: Arc<Bot>, client: Arc<Client>) -> anyho
 			}
 			_ => bail!("{}:unsupported media_kind", line!()),
 		};
-	let sent_mx_msg = matrix_room.send(message).await?;
+	let sent_mx_msg = utils::matrix::send(matrix_room.clone(), message).await?;
 	update_bridged_messages(
 		sent_mx_msg.event_id,
 		(msg.chat.id, msg.id),
@@ -206,7 +208,7 @@ pub async fn tg_to_mx(msg: Message, bot: Arc<Bot>, client: Arc<Client>) -> anyho
 
 	if let Some(caption) = msg.caption() {
 		let message = RoomMessageEventContent::text_plain(caption);
-		matrix_room.send(message).await?;
+		utils::matrix::send(matrix_room, message).await?;
 	}
 
 	Ok(())

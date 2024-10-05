@@ -7,10 +7,10 @@ use std::sync::Arc;
 mod commands;
 mod utils;
 
-pub async fn event_handler(client: Arc<Client>, bot_id: String) {
+pub async fn event_handler(client: Arc<Client>) {
 	client.add_event_handler(
-		move |ev: SyncRoomMessageEvent, room: Room, _client: Client| async move {
-			if ev.sender().as_str() == bot_id.as_str() {
+		move |ev: SyncRoomMessageEvent, room: Room, client: Client| async move {
+			if ev.sender().as_str() == client.user_id().unwrap().as_str() {
 				return;
 			}
 			if let SyncMessageLikeEvent::Original(original_message) = ev {
