@@ -59,14 +59,12 @@ pub async fn dispatch(client: Arc<Client>) {
 		},
 	);
 	let client_to_tg = client.clone();
-	tokio::spawn(async move {
-		let tg_update_handler =
-			teloxide::types::Update::filter_message().branch(teloxide::dptree::endpoint(tg_to_mx));
-		let err_handler = teloxide::error_handlers::LoggingErrorHandler::new();
-		Dispatcher::builder(bot, tg_update_handler)
-			.dependencies(teloxide::dptree::deps![client_to_tg])
-			.build()
-			.dispatch_with_listener(listener, err_handler)
-			.await;
-	});
+	let tg_update_handler =
+		teloxide::types::Update::filter_message().branch(teloxide::dptree::endpoint(tg_to_mx));
+	let err_handler = teloxide::error_handlers::LoggingErrorHandler::new();
+	Dispatcher::builder(bot, tg_update_handler)
+		.dependencies(teloxide::dptree::deps![client_to_tg])
+		.build()
+		.dispatch_with_listener(listener, err_handler)
+		.await;
 }
