@@ -264,9 +264,25 @@ pub async fn get_to_tg_data<'a>(
 		..Default::default()
 	};
 	let message_type = &from_mx_data.mx_event.content.msgtype;
+	let is_reply = {
+		if let Some(relates_to) = &from_mx_data.mx_event.content.relates_to {
+			match relates_to {
+				Relation::Reply { .. } => true,
+				_ => false,
+			}
+		} else {
+			false
+		}
+	};
 	match message_type {
 		MessageType::Text(t) => {
-			tg_data.message = t.body.as_bytes().to_vec();
+			tg_data.message = {
+				if is_reply {
+					t.body.split_once("\n\n").unwrap().1.as_bytes().to_vec()
+				} else {
+					t.body.as_bytes().to_vec()
+				}
+			};
 			tg_data.tg_message_kind = Some(TgMessageKind::Text);
 			tg_data.preview = true;
 		}
