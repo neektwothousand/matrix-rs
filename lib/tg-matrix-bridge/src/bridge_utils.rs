@@ -199,6 +199,7 @@ pub fn update_bridged_messages(
 	});
 	bridged_messages.reverse();
 	bridged_messages.truncate(1000);
+	bridged_messages.reverse();
 	rmp_serde::encode::write(&mut File::create(bm_file_path)?, &bridged_messages)?;
 	Ok(())
 }
