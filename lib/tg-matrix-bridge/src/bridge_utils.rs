@@ -197,7 +197,9 @@ pub fn update_bridged_messages(
 		matrix_id: matrix_event_id,
 		telegram_id: (telegram_event_id.0, telegram_event_id.1),
 	});
-	rmp_serde::encode::write(&mut File::create(bm_file_path)?, &bridged_messages).unwrap();
+	bridged_messages.reverse();
+	bridged_messages.truncate(1000);
+	rmp_serde::encode::write(&mut File::create(bm_file_path)?, &bridged_messages)?;
 	Ok(())
 }
 
