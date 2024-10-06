@@ -1,8 +1,4 @@
-use std::{
-	fs::File,
-	path::Path,
-	sync::{Arc, LazyLock},
-};
+use std::{fs::File, path::Path, sync::LazyLock};
 
 use anyhow::{bail, Context};
 
@@ -21,6 +17,7 @@ use matrix_sdk::{
 	Client, Room,
 };
 
+use serde::Deserialize;
 use teloxide::{
 	adaptors::{throttle::Limits, Throttle},
 	payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters},
@@ -33,15 +30,10 @@ use crate::db::BridgedMessage;
 
 pub type MatrixMedia = (String, Vec<u8>, MessageType);
 
-pub struct MatrixChat<'a> {
-	pub id: &'a str,
-}
-pub struct TelegramChat {
-	pub id: i64,
-}
-pub struct Bridge<'a> {
-	pub matrix_chat: MatrixChat<'a>,
-	pub telegram_chat: TelegramChat,
+#[derive(Deserialize)]
+pub struct Bridge {
+	pub mx_id: String,
+	pub tg_id: i64,
 }
 
 pub enum TgMessageKind {
@@ -52,7 +44,7 @@ pub enum TgMessageKind {
 }
 #[derive(Default)]
 pub struct BmTgData {
-	pub bot: Option<Arc<Throttle<Bot>>>,
+	pub bot: Option<Throttle<Bot>>,
 	pub chat_id: Option<ChatId>,
 	pub message: Vec<u8>,
 	pub tg_message_kind: Option<TgMessageKind>,
@@ -64,47 +56,6 @@ pub struct BmMxData<'a> {
 	pub mx_msg_type: &'a MessageType,
 	pub room: Room,
 }
-
-pub static BRIDGES: LazyLock<Vec<Bridge>> = LazyLock::new(|| {
-	vec![
-		// The Wired
-		Bridge {
-			matrix_chat: MatrixChat {
-				id: "!vUWLFTSVVBjhMouZpF:matrix.org",
-			},
-			telegram_chat: TelegramChat {
-				id: -1001402125530i64,
-			},
-		},
-		// OTHERWORLD
-		Bridge {
-			matrix_chat: MatrixChat {
-				id: "!6oZjqONVahFLOKTvut:matrix.archneek.me",
-			},
-			telegram_chat: TelegramChat {
-				id: -1002152065322i64,
-			},
-		},
-		// /d/egen
-		Bridge {
-			matrix_chat: MatrixChat {
-				id: "!Lk2SLHrfW23HEhYGbA:matrix.archneek.me",
-			},
-			telegram_chat: TelegramChat {
-				id: -1001621395690i64,
-			},
-		},
-		// acaposting
-		Bridge {
-			matrix_chat: MatrixChat {
-				id: "!RO7hD9kX26IO70rpXW:matrix.archneek.me",
-			},
-			telegram_chat: TelegramChat {
-				id: -1001945348817i64,
-			},
-		}
-	]
-});
 
 pub static BM_FILE_PATH: LazyLock<&str> = LazyLock::new(|| "bridged_messages/");
 
@@ -164,10 +115,6 @@ pub async fn get_matrix_media(
 pub async fn get_tg_bot() -> Throttle<teloxide::Bot> {
 	let token = std::fs::read_to_string("tg_token").unwrap();
 	Bot::new(token).throttle(Limits::default())
-}
-
-pub fn get_tg_webhook_link(token: &str) -> String {
-	format!("https://archneek.me/{token}")
 }
 
 pub fn get_user_name(msg: &Message) -> anyhow::Result<String> {
@@ -254,25 +201,21 @@ pub fn find_tg_msg_id(reply: AnyMessageLikeEvent, mx_chat: &str) -> Option<Messa
 
 pub async fn get_to_tg_data<'a>(
 	from_mx_data: &BmMxData<'a>,
-	bot: Arc<Throttle<Bot>>,
+	bot: Throttle<Bot>,
 	client: Client,
-	bridge: &Bridge<'a>,
+	bridge: &Bridge,
 ) -> anyhow::Result<BmTgData> {
 	let mut tg_data = BmTgData {
 		bot: Some(bot),
-		chat_id: Some(ChatId(bridge.telegram_chat.id)),
+		chat_id: Some(ChatId(bridge.tg_id)),
 		..Default::default()
 	};
 	let message_type = &from_mx_data.mx_event.content.msgtype;
 	let is_reply = {
-		if let Some(relates_to) = &from_mx_data.mx_event.content.relates_to {
-			match relates_to {
-				Relation::Reply { .. } => true,
-				_ => false,
-			}
-		} else {
-			false
-		}
+		matches!(
+			&from_mx_data.mx_event.content.relates_to,
+			Some(Relation::Reply { .. })
+		)
 	};
 	match message_type {
 		MessageType::Text(t) => {
@@ -336,7 +279,7 @@ pub async fn get_matrix_reply(
 }
 
 pub async fn bot_send_request(
-	bot: Arc<Throttle<Bot>>,
+	bot: Throttle<Bot>,
 	to_tg_data: BmTgData,
 	chat_id: ChatId,
 	reply_params: ReplyParameters,

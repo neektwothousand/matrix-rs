@@ -5,16 +5,19 @@ use matrix_sdk::ruma::events::room::message::{MessageType, SyncRoomMessageEvent}
 use matrix_sdk::ruma::events::SyncMessageLikeEvent;
 use matrix_sdk::ruma::RoomId;
 use matrix_sdk::{config::SyncSettings, ruma, Client, Room};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use serde::Deserialize;
 use std::io::Write;
+use std::sync::Arc;
+use tg_matrix_bridge::bridge_utils::Bridge;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct User {
 	name: String,
 	password: String,
 	room_id: String,
+	webhook_url: String,
 	anilist_ids: Vec<u64>,
+	bridges: Vec<Bridge>,
 }
 
 #[tokio::main]
@@ -33,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
 		})
 		.init();
 
-	let user: User = serde_json::from_reader(std::fs::File::open("bot_login_data.json")?)?;
+	let user: User = toml::from_str(&std::fs::read_to_string("bot_data.toml")?)?;
 
 	let u = ruma::UserId::parse(&user.name)?;
 	let client = Arc::new(
@@ -71,9 +74,16 @@ async fn main() -> anyhow::Result<()> {
 		}
 	});
 	let bridge_client = client.clone();
+	let bridges = Arc::new(user.bridges);
+	let webhook_url = Arc::new(user.webhook_url);
 	tokio::spawn(async move {
 		loop {
-			let res = tokio::spawn(tg_matrix_bridge::dispatch(bridge_client.clone())).await;
+			let res = tokio::spawn(tg_matrix_bridge::dispatch(
+				bridge_client.clone(),
+				bridges.clone(),
+				webhook_url.clone(),
+			))
+			.await;
 			log::error!("{:?}", res);
 		}
 	});

@@ -17,9 +17,7 @@ use matrix_sdk::{
 	Client, Room,
 };
 
-use crate::bridge_utils::{
-	find_mx_event_id, get_user_name, update_bridged_messages, Bridge, BRIDGES,
-};
+use crate::bridge_utils::{find_mx_event_id, get_user_name, update_bridged_messages, Bridge};
 
 async fn get_reply_to_message<'a>(
 	msg: &Message,
@@ -42,20 +40,23 @@ async fn get_reply_to_message<'a>(
 	msg_like_event.as_original().cloned()
 }
 
-pub async fn tg_to_mx(msg: Message, bot: Arc<Throttle<Bot>>, client: Arc<Client>) -> anyhow::Result<()> {
+pub async fn tg_to_mx(
+	msg: Message,
+	bot: Throttle<Bot>,
+	client: Arc<Client>,
+	bridges: Arc<Vec<Bridge>>,
+) -> anyhow::Result<()> {
 	let user = get_user_name(&msg)?;
 	let bot = <Throttle<Bot> as Clone>::clone(&bot).into_inner();
 	let MessageKind::Common(ref msg_common) = msg.kind else {
 		bail!("");
 	};
 
-	let bridge: &Bridge = BRIDGES
+	let bridge: &Bridge = bridges
 		.iter()
-		.find(|b| b.telegram_chat.id == msg.chat.id.0)
+		.find(|b| b.tg_id == msg.chat.id.0)
 		.context("chat isn't bridged")?;
-	let matrix_room = client
-		.get_room(&RoomId::parse(bridge.matrix_chat.id)?)
-		.unwrap();
+	let matrix_room = client.get_room(&RoomId::parse(&bridge.mx_id)?).unwrap();
 	let reply_to_message = if let Some(msg) = &msg_common.reply_to_message {
 		get_reply_to_message(msg, &matrix_room).await
 	} else {
