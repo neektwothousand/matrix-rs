@@ -94,6 +94,15 @@ pub static BRIDGES: LazyLock<Vec<Bridge>> = LazyLock::new(|| {
 				id: -1001621395690i64,
 			},
 		},
+		// acaposting
+		Bridge {
+			matrix_chat: MatrixChat {
+				id: "!RO7hD9kX26IO70rpXW:matrix.archneek.me",
+			},
+			telegram_chat: TelegramChat {
+				id: -1001945348817i64,
+			},
+		}
 	]
 });
 
