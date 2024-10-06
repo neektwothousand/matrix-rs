@@ -5,6 +5,7 @@ use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
 use matrix_sdk::Room;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::sync::Arc;
 
 pub async fn read_or_create_device_id(login_builder: LoginBuilder) -> anyhow::Result<()> {
 	if let Ok(mut f) = File::open("device_id") {
@@ -20,7 +21,7 @@ pub async fn read_or_create_device_id(login_builder: LoginBuilder) -> anyhow::Re
 	Ok(())
 }
 
-pub async fn send(room: Room, content: RoomMessageEventContent) -> anyhow::Result<Response> {
+pub async fn send(room: Arc<Room>, content: RoomMessageEventContent) -> anyhow::Result<Response> {
 	loop {
 		match room.send(content.clone()).await {
 			Ok(response) => return Ok(response),

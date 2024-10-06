@@ -201,7 +201,7 @@ pub async fn tg_to_mx(msg: Message, bot: Arc<Throttle<Bot>>, client: Arc<Client>
 			}
 			_ => bail!("{}:unsupported media_kind", line!()),
 		};
-	let sent_mx_msg = utils::matrix::send(matrix_room.clone(), message).await?;
+	let sent_mx_msg = utils::matrix::send(matrix_room.clone().into(), message).await?;
 	update_bridged_messages(
 		sent_mx_msg.event_id,
 		(msg.chat.id, msg.id),
@@ -210,7 +210,7 @@ pub async fn tg_to_mx(msg: Message, bot: Arc<Throttle<Bot>>, client: Arc<Client>
 
 	if let Some(caption) = msg.caption() {
 		let message = RoomMessageEventContent::text_plain(caption);
-		utils::matrix::send(matrix_room, message).await?;
+		utils::matrix::send(matrix_room.into(), message).await?;
 	}
 
 	Ok(())

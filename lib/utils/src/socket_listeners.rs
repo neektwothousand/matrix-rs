@@ -40,7 +40,7 @@ async fn send_message(
 	room: Arc<Room>,
 ) -> anyhow::Result<()> {
 	let content = RoomMessageEventContent::text_plain(sock_message?);
-	let res = room.send(content).await?;
+	let res = crate::matrix::send(room.clone(), content).await?;
 	delayed_redaction(&room, res).await;
 	Ok(())
 }
