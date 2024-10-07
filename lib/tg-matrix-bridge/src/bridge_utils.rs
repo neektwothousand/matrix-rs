@@ -8,7 +8,7 @@ use matrix_sdk::{
 		events::{
 			room::message::{
 				FileMessageEventContent, ImageMessageEventContent, MessageType, Relation,
-				RoomMessageEventContent,
+				RoomMessageEventContent, VideoMessageEventContent,
 			},
 			AnyMessageLikeEvent, AnyTimelineEvent, OriginalSyncMessageLikeEvent,
 		},
@@ -236,6 +236,13 @@ pub async fn get_to_tg_data<'a>(
 			tg_data.tg_message_kind = Some(TgMessageKind::Photo);
 			tg_data.file_name = Some(i.body.clone());
 		}
+		MessageType::Video(v) => {
+			let ec = VideoMessageEventContent::new(v.body.clone(), v.source.clone());
+			let message = get_event_content_vec(ec, &client).await?;
+			tg_data.message = message;
+			tg_data.tg_message_kind = Some(TgMessageKind::Document);
+			tg_data.file_name = Some(v.body.clone())
+		}
 		MessageType::File(f) => {
 			let ec = FileMessageEventContent::new(f.body.clone(), f.source.clone());
 			let message = get_event_content_vec(ec, &client).await?;
@@ -243,7 +250,7 @@ pub async fn get_to_tg_data<'a>(
 			tg_data.tg_message_kind = Some(TgMessageKind::Document);
 			tg_data.file_name = Some(f.body.clone())
 		}
-		_ => bail!(""),
+		t => bail!("unsupported type: {:?}", t),
 	}
 	Ok(tg_data)
 }
