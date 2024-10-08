@@ -6,16 +6,16 @@ use crate::tg_handlers::tg_to_mx;
 use bridge_utils::Bridge;
 use matrix_sdk::event_handler::RawEvent;
 use matrix_sdk::media::MediaEventContent;
-use matrix_sdk::ruma::events::relation::InReplyTo;
 use matrix_sdk::ruma::events::room::message::{
-	ImageMessageEventContent, MessageType, Relation, RoomMessageEventContent,
+	ImageMessageEventContent, MessageType, RoomMessageEventContent, ForwardThread, AddMentions,
 };
 use matrix_sdk::ruma::events::{
-	AnyMessageLikeEventContent, AnySyncMessageLikeEvent, MessageLikeUnsigned, OriginalMessageLikeEvent
+	AnyMessageLikeEventContent, AnyMessageLikeEvent, AnySyncMessageLikeEvent, MessageLikeUnsigned, OriginalMessageLikeEvent, AnyTimelineEvent
 };
 use matrix_sdk::ruma::EventId;
 use matrix_sdk::Client;
 
+use serde_json::Value;
 use teloxide::dispatching::{Dispatcher, UpdateFilterExt};
 use teloxide::update_listeners::webhooks;
 
@@ -66,20 +66,35 @@ pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_ur
 				};
 				let event_content = ImageMessageEventContent::new(body, source);
 				let message_type = MessageType::Image(event_content);
-				let mut room_message = RoomMessageEventContent::new(message_type);
-				let raw_json_value =
-					serde_json::to_value(raw.get()).unwrap();
+				let room_message = RoomMessageEventContent::new(message_type);
+				let raw_json_value: Value =
+					serde_json::from_str(raw.get()).unwrap();
 				let reply_event_id = match raw_json_value["content"].get("m.relates_to") {
 					Some(relates_to) => {
-						relates_to.get("event_id")
+						if let Some(in_reply_to) = relates_to.get("m.in_reply_to") {
+							in_reply_to.get("event_id")
+						} else {
+							None
+						}
 					}
-					None => None,
+					None => {
+						log::error!("{:?}", raw_json_value);
+						None
+					}
 				};
 				if let Some(reply_event_id) = reply_event_id {
-					let reply_event_id = reply_event_id.as_str().unwrap();
-					room_message.relates_to = Some(Relation::Reply {
-						in_reply_to: InReplyTo::new(EventId::parse(reply_event_id).unwrap()),
-					})
+					let event_id = EventId::parse(reply_event_id.as_str().unwrap()).unwrap();
+					let raw_ev = room.event(&event_id).await.unwrap().event;
+					let ev = match raw_ev.deserialize_as::<AnyTimelineEvent>().unwrap() {
+						AnyTimelineEvent::MessageLike(m) => m,
+						_ => return,
+					};
+					let msg_like_event = match ev {
+						AnyMessageLikeEvent::RoomMessage(m) => m,
+						_ => return,
+					};
+					let oc = msg_like_event.as_original().unwrap();
+					room_message.clone().make_reply_to(oc, ForwardThread::No, AddMentions::No);
 				};
 				room_message
 			} else if let AnyMessageLikeEventContent::RoomMessage(room_message) = oc {
