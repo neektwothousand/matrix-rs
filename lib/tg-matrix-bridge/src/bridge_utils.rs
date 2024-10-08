@@ -9,8 +9,7 @@ use matrix_sdk::{
 			room::message::{
 				FileMessageEventContent, ImageMessageEventContent, MessageType, Relation,
 				RoomMessageEventContent, VideoMessageEventContent,
-			},
-			AnyMessageLikeEvent, AnyTimelineEvent, OriginalSyncMessageLikeEvent,
+			}, AnyMessageLikeEvent, AnyMessageLikeEventContent, AnyTimelineEvent, OriginalMessageLikeEvent
 		},
 		EventId, OwnedEventId,
 	},
@@ -52,7 +51,7 @@ pub struct BmTgData {
 	pub preview: bool,
 }
 pub struct BmMxData<'a> {
-	pub mx_event: &'a OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
+	pub mx_event: &'a OriginalMessageLikeEvent<AnyMessageLikeEventContent>,
 	pub mx_msg_type: &'a MessageType,
 	pub room: Room,
 }
@@ -210,12 +209,13 @@ pub async fn get_to_tg_data<'a>(
 		chat_id: Some(ChatId(bridge.tg_id)),
 		..Default::default()
 	};
-	let message_type = &from_mx_data.mx_event.content.msgtype;
+	let message_type = &from_mx_data.mx_msg_type;
+	let relates_to = match &from_mx_data.mx_event.content {
+		AnyMessageLikeEventContent::RoomMessage(RoomMessageEventContent { relates_to, .. }) => relates_to,
+		_ => &None,
+	};
 	let is_reply = {
-		matches!(
-			&from_mx_data.mx_event.content.relates_to,
-			Some(Relation::Reply { .. })
-		)
+		matches!(&relates_to, Some(Relation::Reply { .. }))
 	};
 	match message_type {
 		MessageType::Text(t) => {
@@ -268,14 +268,16 @@ async fn get_event_content_vec(
 }
 
 pub async fn get_matrix_reply(
-	matrix_event: &OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
+	matrix_event: &OriginalMessageLikeEvent<AnyMessageLikeEventContent>,
 	room: &Room,
 ) -> anyhow::Result<AnyMessageLikeEvent> {
-	let Some(relation) = &matrix_event.content.relates_to else {
-		bail!("");
+	let relates_to = match &matrix_event.content {
+		AnyMessageLikeEventContent::RoomMessage(RoomMessageEventContent { relates_to, .. }) => relates_to.clone().context("m.relates_to not found")?,
+		_ => bail!(""),
 	};
-	let Relation::Reply { in_reply_to: reply } = relation else {
-		bail!("");
+	let reply = match &relates_to {
+		Relation::Reply { in_reply_to } => in_reply_to,
+		_ => bail!(""),
 	};
 	let reply_event = room.event(&reply.event_id).await?;
 	let AnyTimelineEvent::MessageLike(reply_message) = reply_event.event.deserialize()? else {
