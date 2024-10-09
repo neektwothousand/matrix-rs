@@ -16,10 +16,22 @@ use matrix_sdk::{
 	ruma::{events::room::message::RoomMessageEventContent, RoomId},
 	Client, Room,
 };
+use matrix_sdk::ruma::OwnedEventId;
+use crate::bridge_structs::Bridge;
+use crate::bridge_utils::{get_bms, get_user_name, update_bridged_messages};
 
-use crate::bridge_utils::{find_mx_event_id, get_user_name, update_bridged_messages, Bridge};
+fn find_mx_event_id(
+	tg_reply: &teloxide::types::Message,
+	mx_chat: &str,
+) -> Option<OwnedEventId> {
+	let bms = get_bms(mx_chat)?;
+	let bm = bms
+		.iter()
+		.find(|t| t.telegram_id == (tg_reply.chat.id, tg_reply.id))?;
+	Some(bm.matrix_id.clone())
+}
 
-async fn get_reply_to_message<'a>(
+async fn get_reply<'a>(
 	msg: &Message,
 	matrix_room: &Room,
 ) -> Option<OriginalMessageLikeEvent<RoomMessageEventContent>> {
@@ -58,7 +70,7 @@ pub async fn tg_to_mx(
 		.context("chat isn't bridged")?;
 	let matrix_room = client.get_room(&RoomId::parse(&bridge.mx_id)?).unwrap();
 	let reply_to_message = if let Some(msg) = &msg_common.reply_to_message {
-		get_reply_to_message(msg, &matrix_room).await
+		get_reply(msg, &matrix_room).await
 	} else {
 		None
 	};

@@ -3,6 +3,9 @@ name = "tg-matrix-bridge"
 version = "0.0.0"
 edition = "2021"
 
+[lib]
+crate-type = ["rlib", "dylib"]
+
 [dependencies]
 teloxide = { version = "0.13.0", default-features = false, features = ["ctrlc_handler", "rustls", "webhooks", "webhooks-axum", "throttle"] }
 mime = { version = "0.3.17", default-features = false }

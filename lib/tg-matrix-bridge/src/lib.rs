@@ -1,16 +1,18 @@
-use crate::bridge_utils::{get_tg_bot, get_to_tg_data, BmMxData};
+use crate::bridge_structs::BmMxData;
+use crate::bridge_utils::{get_tg_bot, get_to_tg_data};
 use std::sync::Arc;
 
+use crate::bridge_structs::Bridge;
 use crate::matrix_handlers::mx_to_tg;
 use crate::tg_handlers::tg_to_mx;
-use bridge_utils::Bridge;
 use matrix_sdk::event_handler::RawEvent;
 use matrix_sdk::media::MediaEventContent;
 use matrix_sdk::ruma::events::room::message::{
-	ImageMessageEventContent, MessageType, RoomMessageEventContent, ForwardThread, AddMentions,
+	AddMentions, ForwardThread, ImageMessageEventContent, MessageType, RoomMessageEventContent,
 };
 use matrix_sdk::ruma::events::{
-	AnyMessageLikeEventContent, AnyMessageLikeEvent, AnySyncMessageLikeEvent, MessageLikeUnsigned, OriginalMessageLikeEvent, AnyTimelineEvent
+	AnyMessageLikeEvent, AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnyTimelineEvent,
+	MessageLikeUnsigned, OriginalMessageLikeEvent,
 };
 use matrix_sdk::ruma::EventId;
 use matrix_sdk::Client;
@@ -19,6 +21,7 @@ use serde_json::Value;
 use teloxide::dispatching::{Dispatcher, UpdateFilterExt};
 use teloxide::update_listeners::webhooks;
 
+pub mod bridge_structs;
 pub mod bridge_utils;
 pub mod db;
 pub mod matrix_handlers;
@@ -67,8 +70,7 @@ pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_ur
 				let event_content = ImageMessageEventContent::new(body, source);
 				let message_type = MessageType::Image(event_content);
 				let room_message = RoomMessageEventContent::new(message_type);
-				let raw_json_value: Value =
-					serde_json::from_str(raw.get()).unwrap();
+				let raw_json_value: Value = serde_json::from_str(raw.get()).unwrap();
 				let reply_event_id = match raw_json_value["content"].get("m.relates_to") {
 					Some(relates_to) => {
 						if let Some(in_reply_to) = relates_to.get("m.in_reply_to") {
@@ -94,7 +96,9 @@ pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_ur
 						_ => return,
 					};
 					let oc = msg_like_event.as_original().unwrap();
-					room_message.clone().make_reply_to(oc, ForwardThread::No, AddMentions::No);
+					room_message
+						.clone()
+						.make_reply_to(oc, ForwardThread::No, AddMentions::No);
 				};
 				room_message
 			} else if let AnyMessageLikeEventContent::RoomMessage(room_message) = oc {
@@ -107,8 +111,7 @@ pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_ur
 				room,
 				mx_msg_type: &room_message.msgtype,
 			};
-			let Ok(to_tg_data) =
-				get_to_tg_data(&from_mx_data, bot_to_matrix, client, bridge).await
+			let Ok(to_tg_data) = get_to_tg_data(&from_mx_data, bot_to_matrix, client, bridge).await
 			else {
 				return;
 			};

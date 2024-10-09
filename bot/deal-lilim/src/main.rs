@@ -8,7 +8,7 @@ use matrix_sdk::{config::SyncSettings, ruma, Client, Room};
 use serde::Deserialize;
 use std::io::Write;
 use std::sync::Arc;
-use tg_matrix_bridge::bridge_utils::Bridge;
+use tg_matrix_bridge::bridge_structs::Bridge;
 
 #[derive(Deserialize)]
 struct User {
@@ -76,6 +76,7 @@ async fn main() -> anyhow::Result<()> {
 	let bridge_client = client.clone();
 	let bridges = Arc::new(user.bridges);
 	let webhook_url = Arc::new(user.webhook_url);
+
 	tokio::spawn(async move {
 		loop {
 			let res = tokio::spawn(tg_matrix_bridge::dispatch(
