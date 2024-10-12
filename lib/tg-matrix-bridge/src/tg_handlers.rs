@@ -1,35 +1,29 @@
 use std::sync::Arc;
 
 use anyhow::{bail, Context};
-use matrix_sdk::media::MediaEventContent;
-use matrix_sdk::ruma::events::relation::InReplyTo;
-use matrix_sdk::ruma::events::room::message::{AddMentions, ForwardThread, OriginalRoomMessageEvent, Relation};
+use matrix_sdk::ruma::events::room::message::{
+	AddMentions, ForwardThread, OriginalRoomMessageEvent,
+};
 use matrix_sdk::ruma::events::room::message::{
 	ImageMessageEventContent, MessageType, VideoMessageEventContent,
 };
 use matrix_sdk::ruma::events::room::MediaSource;
-use matrix_sdk::ruma::events::sticker::StickerEventContent;
-use matrix_sdk::ruma::events::OriginalMessageLikeEvent;
 use matrix_sdk::ruma::events::AnyMessageLikeEvent;
 use matrix_sdk::ruma::events::AnyTimelineEvent;
-use serde_json::Value;
 use teloxide::adaptors::Throttle;
 use teloxide::types::{MediaKind, MessageKind};
 use teloxide::Bot;
 use teloxide::{prelude::Requester, types::Message};
 
+use crate::bridge_structs::Bridge;
+use crate::bridge_utils::{get_bms, get_user_name, update_bridged_messages};
+use matrix_sdk::ruma::OwnedEventId;
 use matrix_sdk::{
 	ruma::{events::room::message::RoomMessageEventContent, RoomId},
 	Client, Room,
 };
-use matrix_sdk::ruma::{EventId, OwnedEventId};
-use crate::bridge_structs::Bridge;
-use crate::bridge_utils::{get_bms, get_user_name, update_bridged_messages};
 
-fn find_mx_event_id(
-	tg_reply: &teloxide::types::Message,
-	mx_chat: &str,
-) -> Option<OwnedEventId> {
+fn find_mx_event_id(tg_reply: &teloxide::types::Message, mx_chat: &str) -> Option<OwnedEventId> {
 	let bms = get_bms(mx_chat)?;
 	let bm = bms
 		.iter()
@@ -37,55 +31,14 @@ fn find_mx_event_id(
 	Some(bm.matrix_id.clone())
 }
 
-async fn get_sticker_reply_event_id(ev: &AnyMessageLikeEvent, room: &Room) -> Option<OwnedEventId> {
-	let sticker_event = match ev {
-		AnyMessageLikeEvent::Sticker(ref m) => m.as_original()?,
-		_ => return None,
-	};
-	let event_id = sticker_event.event_id.clone();
-	let Ok(timeline_event) = room.event(&event_id).await else {
-		return None;
-	};
-	let Ok(raw_json) = serde_json::from_str::<Value>(timeline_event.event.json().get()) else {
-		return None;
-	};
-	let reply_event_id = raw_json.get("content")?.get("m.relates_to")?.get("m.in_reply_to")?.get("event_id")?.as_str()?;
-	let Ok(owned_event_id) = EventId::parse(reply_event_id) else {
-		return None;
-	};
-	Some(owned_event_id)
-}
-
-async fn get_room_message_reply_event_id(ev: &AnyMessageLikeEvent, room: &Room) -> Option<OwnedEventId> {
-	let room_message_event = match ev {
-		AnyMessageLikeEvent::RoomMessage(ref m) => m.as_original()?,
-		_ => return None,
-	};
-	let event_id = room_message_event.event_id.clone();
-	let Ok(timeline_event) = room.event(&event_id).await else {
-		return None;
-	};
-	let Ok(raw_json) = serde_json::from_str::<Value>(timeline_event.event.json().get()) else {
-		return None;
-	};
-	let reply_event_id = raw_json.get("content")?.get("m.relates_to")?.get("m.in_reply_to")?.get("event_id")?.as_str()?;
-	let Ok(owned_event_id) = EventId::parse(reply_event_id) else {
-		return None;
-	};
-	Some(owned_event_id)
-}
-
-async fn get_reply_any_message_like_event(
-	msg: &Message,
-	matrix_room: &Room,
-) -> Option<AnyMessageLikeEvent> {
+async fn get_reply(msg: &Message, matrix_room: &Room) -> Option<AnyMessageLikeEvent> {
 	let event_id = find_mx_event_id(msg, matrix_room.room_id().as_str())?;
 	let raw_ev = matrix_room.event(&event_id).await.ok()?.event;
 	let ev = match raw_ev.deserialize_as::<AnyTimelineEvent>().ok()? {
 		AnyTimelineEvent::MessageLike(m) => m,
 		_ => return None,
 	};
-	return Some(ev);
+	Some(ev)
 }
 
 pub async fn tg_to_mx(
@@ -164,16 +117,18 @@ pub async fn tg_to_mx(
 		None
 	};
 
-	let reply_any_message_like_event = if let Some(msg) = &msg_common.reply_to_message {
-		get_reply_any_message_like_event(msg, &matrix_room).await
-	} else {
-		None
-	};
-	let reply_owned_event_id = if let Some(ev) = reply_any_message_like_event {
-		if let Some(room_message_event_content) = get_room_message_reply_event_id(&ev, &matrix_room).await {
-			Some(room_message_event_content)
-		} else if let Some(sticker_event_content) = get_sticker_reply_event_id(&ev, &matrix_room).await {
-			Some(sticker_event_content)
+	let reply_owned_event_id = if let Some(msg_reply) = &msg_common.reply_to_message {
+		if let Some(ev) = get_reply(msg_reply, &matrix_room).await {
+			let event_id = match ev {
+				AnyMessageLikeEvent::RoomMessage(ref m) => {
+					m.as_original().context("redacted")?.event_id.clone()
+				}
+				AnyMessageLikeEvent::Sticker(ref m) => {
+					m.as_original().context("redacted")?.event_id.clone()
+				}
+				ev => bail!("{:?}", ev),
+			};
+			Some(event_id)
 		} else {
 			None
 		}
@@ -185,7 +140,6 @@ pub async fn tg_to_mx(
 		match &msg_common.media_kind {
 			MediaKind::Text(t) => {
 				let text = format!("{}: {}", user, t.text);
-
 				if let Some(event_id) = reply_owned_event_id {
 					let event = matrix_room.event(&event_id).await?;
 					let msg = event.event.deserialize_as::<OriginalRoomMessageEvent>()?;

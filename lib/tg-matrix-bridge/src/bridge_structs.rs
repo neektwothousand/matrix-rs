@@ -27,7 +27,7 @@ pub struct BmTgData {
 	pub message: Vec<u8>,
 	pub tg_message_kind: Option<TgMessageKind>,
 	pub file_name: Option<String>,
-	pub preview: bool,
+	pub is_preview_disabled: bool,
 }
 
 pub struct BmMxData<'a> {

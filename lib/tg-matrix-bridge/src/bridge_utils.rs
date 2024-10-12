@@ -9,15 +9,17 @@ use matrix_sdk::{
 			room::message::{
 				FileMessageEventContent, ImageMessageEventContent, MessageType, Relation,
 				RoomMessageEventContent, VideoMessageEventContent,
-			}, AnyMessageLikeEventContent,
-		}, OwnedEventId,
+			},
+			AnyMessageLikeEventContent,
+		},
+		OwnedEventId,
 	},
 	Client,
 };
 
 use teloxide::{
 	adaptors::{throttle::Limits, Throttle},
-	payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters},
+	payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters, SendStickerSetters},
 	prelude::{Requester, RequesterExt},
 	types::{ChatId, InputFile, LinkPreviewOptions, Message, MessageId, ReplyParameters},
 	Bot, RequestError,
@@ -106,8 +108,6 @@ pub fn get_bms(mx_chat: &str) -> Option<Vec<BridgedMessage>> {
 	}
 }
 
-
-
 pub async fn get_to_tg_data<'a>(
 	from_mx_data: &BmMxData<'a>,
 	bot: Throttle<Bot>,
@@ -137,13 +137,26 @@ pub async fn get_to_tg_data<'a>(
 				}
 			};
 			tg_data.tg_message_kind = Some(TgMessageKind::Text);
-			tg_data.preview = true;
+			tg_data.is_preview_disabled = false;
 		}
 		MessageType::Image(i) => {
 			let ec = ImageMessageEventContent::new(i.body.clone(), i.source.clone());
 			let message = get_event_content_vec(ec, &client).await?;
 			tg_data.message = message;
-			tg_data.tg_message_kind = Some(TgMessageKind::Photo);
+			let message_kind = if let Some(ref media_info) = i.info {
+				if let Some(ref mimetype) = media_info.mimetype {
+					if mimetype == "image/webp" {
+						Some(TgMessageKind::Sticker)
+					} else {
+						Some(TgMessageKind::Photo)
+					}
+				} else {
+					Some(TgMessageKind::Photo)
+				}
+			} else {
+				Some(TgMessageKind::Photo)
+			};
+			tg_data.tg_message_kind = message_kind;
 			tg_data.file_name = Some(i.body.clone());
 		}
 		MessageType::Video(v) => {
@@ -206,6 +219,13 @@ pub async fn bot_send_request(
 					.reply_parameters(reply_params.clone())
 					.await
 			}
+			Some(TgMessageKind::Sticker) => {
+				let sticker =
+					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
+				bot.send_sticker(chat_id, sticker)
+					.reply_parameters(reply_params.clone())
+					.await
+			}
 			Some(TgMessageKind::Document) => {
 				let document =
 					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
@@ -214,7 +234,7 @@ pub async fn bot_send_request(
 					.reply_parameters(reply_params.clone())
 					.await
 			}
-			_ => bail!(""),
+			None => bail!(""),
 		};
 		match res {
 			Ok(message) => return Ok(message),
