@@ -1,6 +1,6 @@
-use std::{fs::File, path::Path, sync::LazyLock};
+use std::{fs::File, path::Path};
 
-use anyhow::{bail, Context};
+use anyhow::bail;
 
 use matrix_sdk::{
 	media::MediaEventContent,
@@ -10,95 +10,25 @@ use matrix_sdk::{
 				FileMessageEventContent, ImageMessageEventContent, MessageType, Relation,
 				RoomMessageEventContent, VideoMessageEventContent,
 			},
-			AnyMessageLikeEvent, AnyTimelineEvent, OriginalSyncMessageLikeEvent,
+			AnyMessageLikeEventContent,
 		},
-		EventId, OwnedEventId,
+		OwnedEventId,
 	},
-	Client, Room,
+	Client,
 };
 
-use serde::Deserialize;
 use teloxide::{
 	adaptors::{throttle::Limits, Throttle},
-	payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters},
+	payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters, SendStickerSetters},
 	prelude::{Requester, RequesterExt},
 	types::{ChatId, InputFile, LinkPreviewOptions, Message, MessageId, ReplyParameters},
 	Bot, RequestError,
 };
 
-use crate::db::BridgedMessage;
-
-pub type MatrixMedia = (String, Vec<u8>, MessageType);
-
-#[derive(Deserialize)]
-pub struct Bridge {
-	pub mx_id: String,
-	pub tg_id: i64,
-}
-
-pub enum TgMessageKind {
-	Text,
-	Photo,
-	Sticker,
-	Document,
-}
-#[derive(Default)]
-pub struct BmTgData {
-	pub bot: Option<Throttle<Bot>>,
-	pub chat_id: Option<ChatId>,
-	pub message: Vec<u8>,
-	pub tg_message_kind: Option<TgMessageKind>,
-	pub file_name: Option<String>,
-	pub preview: bool,
-}
-pub struct BmMxData<'a> {
-	pub mx_event: &'a OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
-	pub mx_msg_type: &'a MessageType,
-	pub room: Room,
-}
-
-pub static BM_FILE_PATH: LazyLock<&str> = LazyLock::new(|| "bridged_messages/");
-
-pub trait GetMatrixMedia {
-	fn get_media(
-		client: Client,
-		media: MessageType,
-	) -> impl std::future::Future<Output = anyhow::Result<MatrixMedia>> + Send;
-}
-
-impl GetMatrixMedia for MatrixMedia {
-	async fn get_media(client: Client, media: MessageType) -> anyhow::Result<MatrixMedia> {
-		match media {
-			MessageType::File(m) => {
-				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
-					bail!("");
-				};
-				let value = serde_json::to_value(&m)?;
-				let body = value.get("body").context(dbg!("body not found"))?;
-				Ok((body.to_string(), media, MessageType::File(m)))
-			}
-			MessageType::Image(m) => {
-				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
-					bail!("");
-				};
-				Ok((m.body.clone(), media, MessageType::Image(m)))
-			}
-			MessageType::Audio(m) => {
-				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
-					bail!("");
-				};
-				Ok((m.body.clone(), media, MessageType::Audio(m)))
-			}
-			MessageType::Video(m) => {
-				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
-					bail!("");
-				};
-				Ok((m.body.clone(), media, MessageType::Video(m)))
-			}
-			_ => bail!(""),
-		}
-	}
-}
+use crate::{
+	bridge_structs::{BmMxData, BmTgData, Bridge, GetMatrixMedia, TgMessageKind},
+	db::BridgedMessage,
+};
 
 pub async fn get_matrix_media(
 	client: Client,
@@ -160,7 +90,7 @@ pub fn update_bridged_messages(
 	Ok(())
 }
 
-fn get_bms(mx_chat: &str) -> Option<Vec<BridgedMessage>> {
+pub fn get_bms(mx_chat: &str) -> Option<Vec<BridgedMessage>> {
 	let bm_file_path = format!("bridged_messages/{}.mpk", mx_chat);
 	let file = match File::open(bm_file_path) {
 		Ok(f) => f,
@@ -178,27 +108,6 @@ fn get_bms(mx_chat: &str) -> Option<Vec<BridgedMessage>> {
 	}
 }
 
-pub fn find_mx_event_id(tg_reply: &Message, mx_chat: &str) -> Option<OwnedEventId> {
-	let bms = get_bms(mx_chat)?;
-	let bm = bms
-		.iter()
-		.find(|t| t.telegram_id == (tg_reply.chat.id, tg_reply.id))?;
-	Some(bm.matrix_id.clone())
-}
-
-pub fn find_tg_msg_id(reply: AnyMessageLikeEvent, mx_chat: &str) -> Option<MessageId> {
-	let bms = get_bms(mx_chat)?;
-	let id = match EventId::parse(reply.event_id()) {
-		Ok(id) => id,
-		Err(e) => {
-			log::error!("{}:{}", line!(), e);
-			return None;
-		}
-	};
-	let bm = bms.iter().find(|bm| bm.matrix_id == id)?;
-	Some(bm.telegram_id.1)
-}
-
 pub async fn get_to_tg_data<'a>(
 	from_mx_data: &BmMxData<'a>,
 	bot: Throttle<Bot>,
@@ -210,13 +119,14 @@ pub async fn get_to_tg_data<'a>(
 		chat_id: Some(ChatId(bridge.tg_id)),
 		..Default::default()
 	};
-	let message_type = &from_mx_data.mx_event.content.msgtype;
-	let is_reply = {
-		matches!(
-			&from_mx_data.mx_event.content.relates_to,
-			Some(Relation::Reply { .. })
-		)
+	let message_type = &from_mx_data.mx_msg_type;
+	let relates_to = match &from_mx_data.mx_event.content {
+		AnyMessageLikeEventContent::RoomMessage(RoomMessageEventContent { relates_to, .. }) => {
+			relates_to
+		}
+		_ => &None,
 	};
+	let is_reply = { matches!(&relates_to, Some(Relation::Reply { .. })) };
 	match message_type {
 		MessageType::Text(t) => {
 			tg_data.message = {
@@ -227,13 +137,26 @@ pub async fn get_to_tg_data<'a>(
 				}
 			};
 			tg_data.tg_message_kind = Some(TgMessageKind::Text);
-			tg_data.preview = true;
+			tg_data.is_preview_disabled = false;
 		}
 		MessageType::Image(i) => {
 			let ec = ImageMessageEventContent::new(i.body.clone(), i.source.clone());
 			let message = get_event_content_vec(ec, &client).await?;
 			tg_data.message = message;
-			tg_data.tg_message_kind = Some(TgMessageKind::Photo);
+			let message_kind = if let Some(ref media_info) = i.info {
+				if let Some(ref mimetype) = media_info.mimetype {
+					if mimetype == "image/webp" {
+						Some(TgMessageKind::Sticker)
+					} else {
+						Some(TgMessageKind::Photo)
+					}
+				} else {
+					Some(TgMessageKind::Photo)
+				}
+			} else {
+				Some(TgMessageKind::Photo)
+			};
+			tg_data.tg_message_kind = message_kind;
 			tg_data.file_name = Some(i.body.clone());
 		}
 		MessageType::Video(v) => {
@@ -267,24 +190,6 @@ async fn get_event_content_vec(
 	Ok(message)
 }
 
-pub async fn get_matrix_reply(
-	matrix_event: &OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
-	room: &Room,
-) -> anyhow::Result<AnyMessageLikeEvent> {
-	let Some(relation) = &matrix_event.content.relates_to else {
-		bail!("");
-	};
-	let Relation::Reply { in_reply_to: reply } = relation else {
-		bail!("");
-	};
-	let reply_event = room.event(&reply.event_id).await?;
-	let AnyTimelineEvent::MessageLike(reply_message) = reply_event.event.deserialize()? else {
-		bail!("");
-	};
-
-	Ok(reply_message)
-}
-
 pub async fn bot_send_request(
 	bot: Throttle<Bot>,
 	to_tg_data: BmTgData,
@@ -314,6 +219,13 @@ pub async fn bot_send_request(
 					.reply_parameters(reply_params.clone())
 					.await
 			}
+			Some(TgMessageKind::Sticker) => {
+				let sticker =
+					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
+				bot.send_sticker(chat_id, sticker)
+					.reply_parameters(reply_params.clone())
+					.await
+			}
 			Some(TgMessageKind::Document) => {
 				let document =
 					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
@@ -322,7 +234,7 @@ pub async fn bot_send_request(
 					.reply_parameters(reply_params.clone())
 					.await
 			}
-			_ => bail!(""),
+			None => bail!(""),
 		};
 		match res {
 			Ok(message) => return Ok(message),
