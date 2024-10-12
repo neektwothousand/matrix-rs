@@ -143,16 +143,11 @@ pub async fn get_to_tg_data<'a>(
 			let ec = ImageMessageEventContent::new(i.body.clone(), i.source.clone());
 			let message = get_event_content_vec(ec, &client).await?;
 			tg_data.message = message;
-			let message_kind = if let Some(ref media_info) = i.info {
-				if let Some(ref mimetype) = media_info.mimetype {
-					if mimetype == "image/webp" {
-						Some(TgMessageKind::Sticker)
-					} else {
-						Some(TgMessageKind::Photo)
-					}
-				} else {
-					Some(TgMessageKind::Photo)
-				}
+			let mimetype = i.info.as_ref().map(|info| info.mimetype.as_ref()
+				.map(|mimetype| mimetype)
+			).flatten();
+			let message_kind = if mimetype == Some(&String::from("image/webp")) {
+				Some(TgMessageKind::Sticker)
 			} else {
 				Some(TgMessageKind::Photo)
 			};
