@@ -141,17 +141,17 @@ pub async fn get_to_tg_data<'a>(
 		}
 		MessageType::Image(i) => {
 			let ec = ImageMessageEventContent::new(i.body.clone(), i.source.clone());
-			let message = get_event_content_vec(ec, &client).await?;
-			tg_data.message = message;
-			let mimetype = i.info.as_ref().map(|info| info.mimetype.as_ref()
-				.map(|mimetype| mimetype)
-			).flatten();
-			let message_kind = if mimetype == Some(&String::from("image/webp")) {
-				Some(TgMessageKind::Sticker)
+			tg_data.message = get_event_content_vec(ec, &client).await?;
+			let is_sticker = i
+				.info
+				.as_ref()
+				.and_then(|info| info.mimetype.as_ref())
+				.is_some_and(|mimetype| mimetype == "image/webp");
+			tg_data.tg_message_kind = Some(if is_sticker {
+				TgMessageKind::Sticker
 			} else {
-				Some(TgMessageKind::Photo)
-			};
-			tg_data.tg_message_kind = message_kind;
+				TgMessageKind::Photo
+			});
 			tg_data.file_name = Some(i.body.clone());
 		}
 		MessageType::Video(v) => {
