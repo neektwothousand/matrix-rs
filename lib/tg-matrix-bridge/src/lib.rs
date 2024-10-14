@@ -68,7 +68,8 @@ pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_ur
 					return;
 				};
 				let event_content = ImageMessageEventContent::new(body, source);
-				let message_type = MessageType::Image(event_content.info(Some(Box::new(sticker.info))));
+				let image_info = Some(Box::new(sticker.info));
+				let message_type = MessageType::Image(event_content.info(image_info));
 				let room_message = RoomMessageEventContent::new(message_type);
 				let raw_json_value: Value = serde_json::from_str(raw.get()).unwrap();
 				let reply_event_id = match raw_json_value["content"].get("m.relates_to") {
