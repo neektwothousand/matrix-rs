@@ -7,15 +7,16 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-pub async fn read_or_create_device_id(login_builder: LoginBuilder) -> anyhow::Result<()> {
-	if let Ok(mut f) = File::open("device_id") {
+pub async fn read_or_create_device_id(path: &str, login_builder: LoginBuilder) -> anyhow::Result<()> {
+	let file_path = format!("{path}device_id");
+	if let Ok(mut f) = File::open(&file_path) {
 		let mut device_id = String::new();
 		f.read_to_string(&mut device_id)?;
 
 		login_builder.device_id(&device_id).send().await?;
 	} else {
 		let response = login_builder.send().await?;
-		let mut f = File::create("device_id")?;
+		let mut f = File::create(&file_path)?;
 		f.write_all(response.device_id.as_bytes())?;
 	}
 	Ok(())

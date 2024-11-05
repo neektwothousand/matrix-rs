@@ -57,7 +57,7 @@ pub async fn tg_to_mx(
 		.iter()
 		.find(|b| b.tg_id == msg.chat.id.0)
 		.context("chat isn't bridged")?;
-	let matrix_room = client.get_room(&RoomId::parse(&bridge.mx_id)?).unwrap();
+	let matrix_room = client.get_room(&RoomId::parse(&bridge.mx_id)?).context("can't get matrix room")?;
 
 	let tg_file: Option<(String, mime::Mime)> = match msg_common.media_kind {
 		MediaKind::Photo(ref m) => {
