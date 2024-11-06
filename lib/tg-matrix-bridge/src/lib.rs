@@ -52,7 +52,9 @@ pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_ur
 			else {
 				return;
 			};
-			let Some(oc) = ev.original_content() else { return };
+			let Some(oc) = ev.original_content() else {
+				return;
+			};
 			let original_ev = OriginalMessageLikeEvent {
 				content: oc.clone(),
 				event_id: ev.event_id().into(),

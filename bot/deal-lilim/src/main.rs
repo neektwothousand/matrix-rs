@@ -51,7 +51,9 @@ async fn main() -> anyhow::Result<()> {
 			.build()
 			.await?,
 	);
-	let login_builder = bridge_client.matrix_auth().login_username(u, &user.login_data[0].password);
+	let login_builder = bridge_client
+		.matrix_auth()
+		.login_username(u, &user.login_data[0].password);
 	utils::matrix::read_or_create_device_id("bridge", login_builder).await?;
 
 	let u = ruma::UserId::parse(&user.login_data[1].name)?;
@@ -62,7 +64,9 @@ async fn main() -> anyhow::Result<()> {
 			.build()
 			.await?,
 	);
-	let login_builder = utils_client.matrix_auth().login_username(u, &user.login_data[1].password);
+	let login_builder = utils_client
+		.matrix_auth()
+		.login_username(u, &user.login_data[1].password);
 	utils::matrix::read_or_create_device_id("utils", login_builder).await?;
 
 	utils_client.sync_once(SyncSettings::default()).await?;
@@ -99,7 +103,8 @@ async fn main() -> anyhow::Result<()> {
 				tg_matrix_bridge::dispatch(
 					bridge_client_dispatch.clone(),
 					bridges.clone(),
-					webhook_url.clone()),
+					webhook_url.clone()
+				),
 				bridge_client.sync(SyncSettings::default()),
 			);
 			if let Err(res) = res.1 {
