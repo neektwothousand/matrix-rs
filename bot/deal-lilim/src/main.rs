@@ -97,17 +97,11 @@ async fn main() -> anyhow::Result<()> {
 	let webhook_url = Arc::new(user.webhook_url);
 
 	let bridge_client_dispatch = bridge_client.clone();
+	tokio::spawn(tg_matrix_bridge::dispatch(bridge_client_dispatch, bridges, webhook_url));
 	tokio::spawn(async move {
 		loop {
-			let res = tokio::join!(
-				tg_matrix_bridge::dispatch(
-					bridge_client_dispatch.clone(),
-					bridges.clone(),
-					webhook_url.clone()
-				),
-				bridge_client.sync(SyncSettings::default()),
-			);
-			if let Err(res) = res.1 {
+			let res = bridge_client.sync(SyncSettings::default()).await;
+			if let Err(res) = res {
 				log::debug!("{:?}", res);
 			}
 		}
