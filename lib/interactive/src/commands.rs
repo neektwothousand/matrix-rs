@@ -1,6 +1,13 @@
 use std::fs;
 use std::io::Seek;
 use std::io::Write;
+use std::io::{self};
+use std::path::Path;
+use zip::{
+	self,
+	write::{FileOptionExtension, FileOptions},
+	ZipWriter,
+};
 
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::room::Room;
@@ -49,16 +56,50 @@ fn sign_split_vec_str<'a>(
 	vec_str
 }
 
-fn zip_file<W: Write + Seek>(zip: &mut zip::ZipWriter<W>, file: &str) {
+fn zip_file<'k, T: FileOptionExtension, W: Write + Seek>(
+	zip: &mut zip::ZipWriter<W>,
+	file: &str,
+	options: FileOptions<'k, T>,
+) {
 	let read = match fs::read(file) {
 		Ok(read) => read,
 		Err(_) => return,
 	};
-	let options =
-		zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 	zip.start_file(file, options).unwrap();
 	let buf = &read[..];
 	zip.write_all(buf).unwrap();
+}
+
+fn zip_rec<'k, T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
+	out_zip_writer: W,
+	path: P,
+	options: FileOptions<'k, T>,
+) -> io::Result<ZipWriter<W>> {
+	let mut zip_writer = zip::ZipWriter::new(out_zip_writer);
+	zip_rec_aux(&mut zip_writer, path, options)?;
+	Ok(zip_writer)
+}
+
+fn zip_rec_aux<'k, T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
+	zip: &mut zip::ZipWriter<W>,
+	path: P,
+	options: FileOptions<'k, T>,
+) -> io::Result<()> {
+	for maybe_dir_entry in fs::read_dir(path)? {
+		let dir_entry = maybe_dir_entry?;
+
+		let file_type = dir_entry.file_type()?;
+		if file_type.is_dir() {
+			zip.add_directory_from_path(dir_entry.path(), options.clone())?;
+			zip_rec_aux(zip, dir_entry.path(), options.clone())?;
+		} else if file_type.is_file() {
+			let mut file = fs::File::open(dir_entry.path())?;
+			zip.start_file_from_path(dir_entry.path(), options.clone())
+				.unwrap();
+			std::io::copy(&mut file, zip)?;
+		}
+	}
+	Ok(())
 }
 
 fn cmd(command: &str, args: Vec<&str>, stdin_str: Option<String>) -> String {
@@ -208,27 +249,28 @@ pub async fn match_command(
 				.ok()
 		}
 		"!zip" | "!source" => {
-			let mut zip = {
-				zip::ZipWriter::new(
-					fs::OpenOptions::new()
-						.write(true)
-						.truncate(true)
-						.open("source.zip")
-						.unwrap(),
-				)
-			};
+			let tmp_id = format!("{}{}", original_message.room_id, original_message.event_id);
+			let zip_name = format!("source{}.zip", tmp_id);
+			let file = fs::OpenOptions::new()
+				.write(true)
+				.truncate(true)
+				.create(true)
+				.open(zip_name.clone())
+				.unwrap();
 
-			zip_file(&mut zip, "Cargo.toml");
-			zip_file(&mut zip, "LICENSE");
-			for path in fs::read_dir("src/").unwrap() {
-				zip_file(&mut zip, path.unwrap().path().to_str().unwrap());
-			}
+			let options = zip::write::SimpleFileOptions::default()
+				.compression_method(zip::CompressionMethod::Stored);
+			let mut zip_writer = zip_rec(file, "bot/", options).unwrap();
 
-			zip.finish().unwrap();
+			zip_file(&mut zip_writer, "Cargo.toml", options);
+			zip_file(&mut zip_writer, "LICENSE", options);
+			zip_rec_aux(&mut zip_writer, "lib/", options).unwrap();
+
+			zip_writer.finish().unwrap();
 
 			let mime = "application/zip".parse::<Mime>().unwrap();
-			let file_content = fs::read("source.zip").unwrap();
-			SendMessage::file(room.clone(), (mime, file_content))
+			let file_content = fs::read(&zip_name).unwrap();
+			SendMessage::file(room.clone(), zip_name, (mime, file_content))
 				.await?
 				.reply(original_message)
 				.await

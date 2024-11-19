@@ -45,7 +45,7 @@ impl SendMessage {
 		let message = RoomMessageEventContent::new(MessageType::Image(image_message));
 		Some(Self { room, message })
 	}
-	pub async fn file(room: Room, media: (Mime, Vec<u8>)) -> Option<Self> {
+	pub async fn file(room: Room, file_name: String, media: (Mime, Vec<u8>)) -> Option<Self> {
 		let mxc_uri = match upload(room.clone(), media).await {
 			Ok(response) => response.content_uri,
 			Err(err) => {
@@ -53,7 +53,7 @@ impl SendMessage {
 				return None;
 			}
 		};
-		let file_message = FileMessageEventContent::plain(String::new(), mxc_uri);
+		let file_message = FileMessageEventContent::plain(file_name, mxc_uri);
 		let message = RoomMessageEventContent::new(MessageType::File(file_message));
 		Some(Self { room, message })
 	}

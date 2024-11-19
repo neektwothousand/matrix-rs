@@ -7,3 +7,4 @@ edition = "2021"
 mime = "0.3.17"
 zip = "2.2.0"
 matrix-sdk.workspace = true
+log.workspace = true
