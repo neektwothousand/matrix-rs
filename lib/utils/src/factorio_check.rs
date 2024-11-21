@@ -20,7 +20,7 @@ pub fn factorio_check() -> anyhow::Result<bool> {
 	socket.send_to(&msg, addr)?;
 	let mut buf = [0; 64];
 	socket
-		.set_read_timeout(Some(Duration::from_secs(10)))?;
+		.set_read_timeout(Some(Duration::from_secs(240)))?;
 	match socket.recv(&mut buf) {
 		Ok(_) => Ok(true),
 		Err(_) => Ok(false),
