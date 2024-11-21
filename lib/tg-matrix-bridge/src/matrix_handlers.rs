@@ -1,11 +1,12 @@
 use crate::bridge_structs::{BmMxData, BmTgData};
 use crate::bridge_utils::{bot_send_request, get_bms, update_bridged_messages};
-use anyhow::Context;
+use anyhow::{bail, Context};
 use matrix_sdk::ruma::events::{AnyMessageLikeEventContent, OriginalMessageLikeEvent};
 use matrix_sdk::ruma::{EventId, OwnedEventId};
 use serde_json::Value;
 use teloxide::types::MessageId;
 use teloxide::types::{LinkPreviewOptions, ReplyParameters};
+use teloxide::ApiError;
 
 fn find_tg_msg_id(reply: OwnedEventId, mx_chat: &str) -> Option<MessageId> {
 	let bms = get_bms(mx_chat)?;
@@ -65,15 +66,33 @@ pub async fn mx_to_tg(to_tg_data: BmTgData, from_mx_data: BmMxData<'_>) -> anyho
 		show_above_text: false,
 	};
 	let reply_params = ReplyParameters::new(reply_to_id).allow_sending_without_reply();
-	let t_msg = bot_send_request(
-		bot,
-		to_tg_data,
+	let res = bot_send_request(
+		bot.clone(),
+		to_tg_data.clone(),
 		chat_id,
-		reply_params,
-		link_preview,
+		reply_params.clone(),
+		link_preview.clone(),
 		from_user.to_string(),
 	)
-	.await?;
+	.await;
+	let t_msg = match res {
+		Ok(msg) => msg,
+		Err(teloxide::RequestError::Api(ApiError::RequestEntityTooLarge)) => {
+			let mut to_tg_data = to_tg_data;
+			to_tg_data.message = "telegram sucks and cannot display this message"
+				.to_string()
+				.into_bytes();
+			bot_send_request(
+				bot,
+				to_tg_data,
+				chat_id,
+				reply_params,
+				link_preview,
+				from_user.to_string(),
+			).await?
+		}
+		_ => bail!(""),
+	};
 	update_bridged_messages(
 		from_mx_data.mx_event.event_id.clone(),
 		(t_msg.chat.id, t_msg.id),

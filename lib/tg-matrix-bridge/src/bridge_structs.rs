@@ -7,6 +7,7 @@ use matrix_sdk::ruma::events::{
 use serde::Deserialize;
 use teloxide::{adaptors::Throttle, types::ChatId, Bot};
 
+#[derive(Clone)]
 pub enum TgMessageKind {
 	Text,
 	Photo,
@@ -20,7 +21,7 @@ pub struct Bridge {
 	pub tg_id: i64,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct BmTgData {
 	pub bot: Option<Throttle<Bot>>,
 	pub chat_id: Option<ChatId>,

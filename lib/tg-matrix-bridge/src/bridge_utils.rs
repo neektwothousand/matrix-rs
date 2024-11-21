@@ -192,7 +192,7 @@ pub async fn bot_send_request(
 	reply_params: ReplyParameters,
 	link_preview: LinkPreviewOptions,
 	from_user: String,
-) -> anyhow::Result<Message> {
+) -> Result<Message, teloxide::RequestError> {
 	let file_name = to_tg_data.file_name.unwrap_or("unknown".to_string());
 	loop {
 		let res = match to_tg_data.tg_message_kind {
@@ -229,24 +229,15 @@ pub async fn bot_send_request(
 					.reply_parameters(reply_params.clone())
 					.await
 			}
-			None => bail!(""),
+			None => unreachable!(""),
 		};
 		match res {
-			Ok(message) => return Ok(message),
-			Err(e) => match e {
-				RequestError::Network(e) => {
-					if e.is_timeout() {
-						continue;
-					} else {
-						bail!("{:?}", e);
-					}
-				}
-				RequestError::Io(e) => bail!("{:?}", e),
-				RequestError::InvalidJson { source, raw } => bail!("{:?} {:?}", source, raw),
-				RequestError::Api(e) => bail!("{:?}", e),
-				RequestError::MigrateToChatId(e) => bail!("{:?}", e),
-				RequestError::RetryAfter(e) => bail!("{:?}", e),
-			},
+			Err(RequestError::Network(e)) if e.is_timeout() => {
+				continue;
+			}
+			x => {
+				return x;
+			}
 		}
 	}
 }
