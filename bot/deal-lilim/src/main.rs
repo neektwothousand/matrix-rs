@@ -1,14 +1,18 @@
 use anyhow::Context;
 use interactive::commands::{match_command, match_text};
 use matrix_sdk::ruma::events::room::member::StrippedRoomMemberEvent;
-use matrix_sdk::ruma::events::room::message::{MessageType, SyncRoomMessageEvent};
+use matrix_sdk::ruma::events::room::message::{
+	MessageType, RoomMessageEventContent, SyncRoomMessageEvent,
+};
 use matrix_sdk::ruma::events::SyncMessageLikeEvent;
 use matrix_sdk::ruma::RoomId;
 use matrix_sdk::{config::SyncSettings, ruma, Client, Room};
 use serde::Deserialize;
 use std::io::Write;
 use std::sync::Arc;
+use std::time::Duration;
 use tg_matrix_bridge::bridge_structs::Bridge;
+use utils::factorio_check::factorio_check;
 
 #[derive(Deserialize)]
 struct LoginData {
@@ -91,6 +95,30 @@ async fn main() -> anyhow::Result<()> {
 			let res =
 				tokio::spawn(utils::socket_listeners::socket_handler(socket_room.clone())).await;
 			log::error!("{:?}", res);
+		}
+	});
+	let factorio_room = room.clone();
+	tokio::spawn(async move {
+		let mut status: bool = false;
+		loop {
+			let res = factorio_check();
+
+			if res.is_err() {
+				tokio::time::sleep(Duration::from_secs(10)).await;
+				continue;
+			}
+
+			let res = res.unwrap();
+			let text = if res == true {
+				"factorio server up"
+			} else {
+				"factorio server down"
+			};
+			let msg = RoomMessageEventContent::text_plain(text);
+			if status != res {
+				let _ = factorio_room.send(msg).await;
+			}
+			status = res;
 		}
 	});
 	let bridges = Arc::new(user.bridges);
