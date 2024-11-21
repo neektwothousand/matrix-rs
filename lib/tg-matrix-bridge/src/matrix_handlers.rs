@@ -89,7 +89,8 @@ pub async fn mx_to_tg(to_tg_data: BmTgData, from_mx_data: BmMxData<'_>) -> anyho
 				reply_params,
 				link_preview,
 				from_user.to_string(),
-			).await?
+			)
+			.await?
 		}
 		_ => bail!(""),
 	};

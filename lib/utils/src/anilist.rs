@@ -59,7 +59,11 @@ async fn send_update(room: &Room, user_ids: &Vec<u64>) -> anyhow::Result<()> {
 			}
 		};
 		let response_json = response.json::<serde_json::Value>().await?;
-		let activity = &response_json.get("data").context("")?.get("Activity").context("")?;
+		let activity = &response_json
+			.get("data")
+			.context("")?
+			.get("Activity")
+			.context("")?;
 		let activity_created_at = {
 			if let Some(activity) = activity.get("createdAt") {
 				activity.as_u64().unwrap()
