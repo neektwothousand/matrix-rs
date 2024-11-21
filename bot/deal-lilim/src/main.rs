@@ -1,16 +1,38 @@
-use anyhow::Context;
-use interactive::commands::{match_command, match_text};
-use matrix_sdk::ruma::events::room::member::StrippedRoomMemberEvent;
-use matrix_sdk::ruma::events::room::message::{
-	MessageType, RoomMessageEventContent, SyncRoomMessageEvent,
+use std::{
+	io::Write,
+	sync::Arc,
+	time::Duration,
 };
-use matrix_sdk::ruma::events::SyncMessageLikeEvent;
-use matrix_sdk::ruma::RoomId;
-use matrix_sdk::{config::SyncSettings, ruma, Client, Room};
+
+use anyhow::Context;
+
+use matrix_sdk::{
+	config::SyncSettings,
+	ruma,
+	ruma::{
+		events::{
+			room::{
+				member::StrippedRoomMemberEvent,
+				message::{
+					MessageType,
+					RoomMessageEventContent,
+					SyncRoomMessageEvent,
+				},
+			},
+			SyncMessageLikeEvent,
+		},
+		RoomId,
+	},
+	Client,
+	Room,
+};
+
 use serde::Deserialize;
-use std::io::Write;
-use std::sync::Arc;
-use std::time::Duration;
+
+use interactive::commands::{
+	match_command,
+	match_text,
+};
 use tg_matrix_bridge::bridge_structs::Bridge;
 use utils::factorio_check::factorio_check;
 
@@ -55,9 +77,7 @@ async fn main() -> anyhow::Result<()> {
 			.build()
 			.await?,
 	);
-	let login_builder = bridge_client
-		.matrix_auth()
-		.login_username(u, &user.login_data[0].password);
+	let login_builder = bridge_client.matrix_auth().login_username(u, &user.login_data[0].password);
 	utils::matrix::read_or_create_device_id("bridge", login_builder).await?;
 
 	let u = ruma::UserId::parse(&user.login_data[1].name)?;
@@ -68,36 +88,35 @@ async fn main() -> anyhow::Result<()> {
 			.build()
 			.await?,
 	);
-	let login_builder = utils_client
-		.matrix_auth()
-		.login_username(u, &user.login_data[1].password);
+	let login_builder = utils_client.matrix_auth().login_username(u, &user.login_data[1].password);
 	utils::matrix::read_or_create_device_id("utils", login_builder).await?;
 
 	utils_client.sync_once(SyncSettings::default()).await?;
 
 	let room_id = RoomId::parse(user.room_id)?;
-	let room = Arc::new(utils_client.get_room(&room_id).context("room not found")?);
+	let utils_client_room = Arc::new(utils_client.get_room(&room_id).context("room not found")?);
 
-	let anilist_room = room.clone();
+	let utils_room = utils_client_room.clone();
 	tokio::spawn(async move {
 		loop {
 			let res = tokio::spawn(utils::anilist::anilist_update(
-				anilist_room.clone(),
+				utils_room.clone(),
 				user.anilist_ids.clone(),
 			))
 			.await;
 			log::error!("{:?}", res);
 		}
 	});
-	let socket_room = room.clone();
+
+	let utils_room = utils_client_room.clone();
 	tokio::spawn(async move {
 		loop {
-			let res =
-				tokio::spawn(utils::socket_listeners::socket_handler(socket_room.clone())).await;
+			let res = utils::socket_listeners::socket_handler(utils_room.clone()).await;
 			log::error!("{:?}", res);
 		}
 	});
-	let factorio_room = room.clone();
+
+	let utils_room = utils_client_room.clone();
 	tokio::spawn(async move {
 		let mut status: bool = false;
 		loop {
@@ -107,29 +126,25 @@ async fn main() -> anyhow::Result<()> {
 				tokio::time::sleep(Duration::from_secs(10)).await;
 				continue;
 			}
-
 			let res = res.unwrap();
-			let text = if res == true {
-				"factorio server up"
+
+			let text = if status != res && res == true {
+				status = true;
+				format!("factorio server up ({})", std::env::var("FACTORIO_ADDR").unwrap())
 			} else {
-				"factorio server down"
+				status = false;
+				tokio::time::sleep(Duration::from_secs(10)).await;
+				continue;
 			};
 			let msg = RoomMessageEventContent::text_plain(text);
-			if status != res {
-				let _ = factorio_room.send(msg).await;
-			}
-			status = res;
+			let _ = utils_room.send(msg).await;
 		}
 	});
 	let bridges = Arc::new(user.bridges);
 	let webhook_url = Arc::new(user.webhook_url);
 
 	let bridge_client_dispatch = bridge_client.clone();
-	tokio::spawn(tg_matrix_bridge::dispatch(
-		bridge_client_dispatch,
-		bridges,
-		webhook_url,
-	));
+	tokio::spawn(tg_matrix_bridge::dispatch(bridge_client_dispatch, bridges, webhook_url));
 	tokio::spawn(async move {
 		loop {
 			let res = bridge_client.sync(SyncSettings::default()).await;

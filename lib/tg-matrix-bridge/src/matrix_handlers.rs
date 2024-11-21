@@ -1,12 +1,35 @@
-use crate::bridge_structs::{BmMxData, BmTgData};
-use crate::bridge_utils::{bot_send_request, get_bms, update_bridged_messages};
-use anyhow::{bail, Context};
-use matrix_sdk::ruma::events::{AnyMessageLikeEventContent, OriginalMessageLikeEvent};
-use matrix_sdk::ruma::{EventId, OwnedEventId};
+use crate::{
+	bridge_structs::{
+		BmMxData,
+		BmTgData,
+	},
+	bridge_utils::{
+		bot_send_request,
+		get_bms,
+		update_bridged_messages,
+	},
+};
+use anyhow::{
+	bail,
+	Context,
+};
+use matrix_sdk::ruma::{
+	events::{
+		AnyMessageLikeEventContent,
+		OriginalMessageLikeEvent,
+	},
+	EventId,
+	OwnedEventId,
+};
 use serde_json::Value;
-use teloxide::types::MessageId;
-use teloxide::types::{LinkPreviewOptions, ReplyParameters};
-use teloxide::ApiError;
+use teloxide::{
+	types::{
+		LinkPreviewOptions,
+		MessageId,
+		ReplyParameters,
+	},
+	ApiError,
+};
 
 fn find_tg_msg_id(reply: OwnedEventId, mx_chat: &str) -> Option<MessageId> {
 	let bms = get_bms(mx_chat)?;
@@ -79,9 +102,8 @@ pub async fn mx_to_tg(to_tg_data: BmTgData, from_mx_data: BmMxData<'_>) -> anyho
 		Ok(msg) => msg,
 		Err(teloxide::RequestError::Api(ApiError::RequestEntityTooLarge)) => {
 			let mut to_tg_data = to_tg_data;
-			to_tg_data.message = "telegram sucks and cannot display this message"
-				.to_string()
-				.into_bytes();
+			to_tg_data.message =
+				"telegram sucks and cannot display this message".to_string().into_bytes();
 			bot_send_request(
 				bot,
 				to_tg_data,

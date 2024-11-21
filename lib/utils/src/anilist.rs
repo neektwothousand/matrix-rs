@@ -1,20 +1,24 @@
 use std::{
 	fs::File,
-	io::{Read, Write},
+	io::{
+		Read,
+		Write,
+	},
 	sync::Arc,
 	time::Duration,
 };
 
 use tokio::time::sleep;
 
-use matrix_sdk::{ruma::events::room::message::RoomMessageEventContent, Room};
+use matrix_sdk::{
+	ruma::events::room::message::RoomMessageEventContent,
+	Room,
+};
 
 use anyhow::Context;
 
 async fn send_update(room: &Room, user_ids: &Vec<u64>) -> anyhow::Result<()> {
-	let reqwest_client = reqwest::Client::builder()
-		.user_agent("matrix-bot")
-		.build()?;
+	let reqwest_client = reqwest::Client::builder().user_agent("matrix-bot").build()?;
 	for user_id in user_ids {
 		let file_name = format!("anilist_{user_id}_createdAt");
 		let last_created_at = {
@@ -59,11 +63,7 @@ async fn send_update(room: &Room, user_ids: &Vec<u64>) -> anyhow::Result<()> {
 			}
 		};
 		let response_json = response.json::<serde_json::Value>().await?;
-		let activity = &response_json
-			.get("data")
-			.context("")?
-			.get("Activity")
-			.context("")?;
+		let activity = &response_json.get("data").context("")?.get("Activity").context("")?;
 		let activity_created_at = {
 			if let Some(activity) = activity.get("createdAt") {
 				activity.as_u64().unwrap()
@@ -82,11 +82,8 @@ async fn send_update(room: &Room, user_ids: &Vec<u64>) -> anyhow::Result<()> {
 			.context("user name not found")?
 			.as_str()
 			.unwrap();
-		let activity_link = &activity
-			.get("siteUrl")
-			.context("siteUrl not found")?
-			.as_str()
-			.unwrap();
+		let activity_link =
+			&activity.get("siteUrl").context("siteUrl not found")?.as_str().unwrap();
 		let anime = &activity
 			.get("media")
 			.context("media not found")?
@@ -96,26 +93,15 @@ async fn send_update(room: &Room, user_ids: &Vec<u64>) -> anyhow::Result<()> {
 			.context("userPreferred not found")?
 			.as_str()
 			.unwrap();
-		let status = &activity
-			.get("status")
-			.context("status not found")?
-			.as_str()
-			.unwrap();
-		let progress = &activity
-			.get("progress")
-			.context("progress not found")?
-			.as_str()
-			.unwrap_or_default();
+		let status = &activity.get("status").context("status not found")?.as_str().unwrap();
+		let progress =
+			&activity.get("progress").context("progress not found")?.as_str().unwrap_or_default();
 		let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
 		if let Err(e) = room.send(RoomMessageEventContent::text_plain(result)).await {
 			eprintln!("{:?}", e);
 			continue;
 		}
-		let mut file = File::options()
-			.write(true)
-			.create(true)
-			.truncate(true)
-			.open(&file_name)?;
+		let mut file = File::options().write(true).create(true).truncate(true).open(&file_name)?;
 		file.write_all(activity_created_at.to_string().as_bytes())?;
 		sleep(Duration::from_secs(60)).await;
 	}

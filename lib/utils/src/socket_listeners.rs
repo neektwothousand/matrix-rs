@@ -1,7 +1,10 @@
 use std::{
 	fs,
 	io::Read,
-	os::unix::net::{UnixListener, UnixStream},
+	os::unix::net::{
+		UnixListener,
+		UnixStream,
+	},
 	path::Path,
 	sync::Arc,
 	time::Duration,
@@ -9,7 +12,8 @@ use std::{
 
 use matrix_sdk::{
 	ruma::{
-		api::client::message::send_message_event, events::room::message::RoomMessageEventContent,
+		api::client::message::send_message_event,
+		events::room::message::RoomMessageEventContent,
 	},
 	Room,
 };

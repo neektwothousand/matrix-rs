@@ -1,11 +1,20 @@
 use anyhow::bail;
-use matrix_sdk::matrix_auth::LoginBuilder;
-use matrix_sdk::ruma::api::client::message::send_message_event::v3::Response;
-use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
-use matrix_sdk::Room;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::sync::Arc;
+use matrix_sdk::{
+	matrix_auth::LoginBuilder,
+	ruma::{
+		api::client::message::send_message_event::v3::Response,
+		events::room::message::RoomMessageEventContent,
+	},
+	Room,
+};
+use std::{
+	fs::File,
+	io::{
+		Read,
+		Write,
+	},
+	sync::Arc,
+};
 
 pub async fn read_or_create_device_id(
 	path: &str,

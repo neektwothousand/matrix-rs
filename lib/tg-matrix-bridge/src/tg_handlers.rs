@@ -1,33 +1,56 @@
 use std::sync::Arc;
 
-use anyhow::{bail, Context};
-use matrix_sdk::ruma::events::room::message::{
-	AddMentions, ForwardThread, OriginalRoomMessageEvent,
+use anyhow::{
+	bail,
+	Context,
 };
-use matrix_sdk::ruma::events::room::message::{
-	ImageMessageEventContent, MessageType, VideoMessageEventContent,
+use matrix_sdk::ruma::events::{
+	room::{
+		message::{
+			AddMentions,
+			ForwardThread,
+			ImageMessageEventContent,
+			MessageType,
+			OriginalRoomMessageEvent,
+			VideoMessageEventContent,
+		},
+		MediaSource,
+	},
+	AnyMessageLikeEvent,
+	AnyTimelineEvent,
 };
-use matrix_sdk::ruma::events::room::MediaSource;
-use matrix_sdk::ruma::events::AnyMessageLikeEvent;
-use matrix_sdk::ruma::events::AnyTimelineEvent;
-use teloxide::adaptors::Throttle;
-use teloxide::types::{MediaKind, MessageKind};
-use teloxide::Bot;
-use teloxide::{prelude::Requester, types::Message};
+use teloxide::{
+	adaptors::Throttle,
+	prelude::Requester,
+	types::{
+		MediaKind,
+		Message,
+		MessageKind,
+	},
+	Bot,
+};
 
-use crate::bridge_structs::Bridge;
-use crate::bridge_utils::{get_bms, get_user_name, update_bridged_messages};
-use matrix_sdk::ruma::OwnedEventId;
+use crate::{
+	bridge_structs::Bridge,
+	bridge_utils::{
+		get_bms,
+		get_user_name,
+		update_bridged_messages,
+	},
+};
 use matrix_sdk::{
-	ruma::{events::room::message::RoomMessageEventContent, RoomId},
-	Client, Room,
+	ruma::{
+		events::room::message::RoomMessageEventContent,
+		OwnedEventId,
+		RoomId,
+	},
+	Client,
+	Room,
 };
 
 fn find_mx_event_id(tg_reply: &teloxide::types::Message, mx_chat: &str) -> Option<OwnedEventId> {
 	let bms = get_bms(mx_chat)?;
-	let bm = bms
-		.iter()
-		.find(|t| t.telegram_id == (tg_reply.chat.id, tg_reply.id))?;
+	let bm = bms.iter().find(|t| t.telegram_id == (tg_reply.chat.id, tg_reply.id))?;
 	Some(bm.matrix_id.clone())
 }
 
@@ -53,29 +76,20 @@ pub async fn tg_to_mx(
 		bail!("");
 	};
 
-	let bridge: &Bridge = bridges
-		.iter()
-		.find(|b| b.tg_id == msg.chat.id.0)
-		.context("chat isn't bridged")?;
-	let matrix_room = client
-		.get_room(&RoomId::parse(&bridge.mx_id)?)
-		.context("can't get matrix room")?;
+	let bridge: &Bridge =
+		bridges.iter().find(|b| b.tg_id == msg.chat.id.0).context("chat isn't bridged")?;
+	let matrix_room =
+		client.get_room(&RoomId::parse(&bridge.mx_id)?).context("can't get matrix room")?;
 
 	let tg_file: Option<(String, mime::Mime)> = match msg_common.media_kind {
 		MediaKind::Photo(ref m) => {
 			let file_path = bot.get_file(&m.photo.last().unwrap().file.id).await?.path;
-			let file_url = format!(
-				"https://api.telegram.org/file/bot{}/{file_path}",
-				bot.token()
-			);
+			let file_url = format!("https://api.telegram.org/file/bot{}/{file_path}", bot.token());
 			Some((file_url, mime::IMAGE_JPEG))
 		}
 		MediaKind::Animation(ref m) => {
 			let file_path = bot.get_file(&m.animation.file.id).await?.path;
-			let file_url = format!(
-				"https://api.telegram.org/file/bot{}/{file_path}",
-				bot.token()
-			);
+			let file_url = format!("https://api.telegram.org/file/bot{}/{file_path}", bot.token());
 			Some((file_url, "video/mp4".parse::<mime::Mime>()?))
 		}
 		MediaKind::Sticker(ref m) => {
@@ -85,26 +99,17 @@ pub async fn tg_to_mx(
 				"image/webp".parse::<mime::Mime>()?
 			};
 			let file_path = bot.get_file(&m.sticker.file.id).await?.path;
-			let file_url = format!(
-				"https://api.telegram.org/file/bot{}/{file_path}",
-				bot.token()
-			);
+			let file_url = format!("https://api.telegram.org/file/bot{}/{file_path}", bot.token());
 			Some((file_url, mime))
 		}
 		MediaKind::Video(ref m) => {
 			let file_path = bot.get_file(&m.video.file.id).await?.path;
-			let file_url = format!(
-				"https://api.telegram.org/file/bot{}/{file_path}",
-				bot.token()
-			);
+			let file_url = format!("https://api.telegram.org/file/bot{}/{file_path}", bot.token());
 			Some((file_url, "video/mp4".parse::<mime::Mime>()?))
 		}
 		MediaKind::Document(ref m) => {
 			let file_path = bot.get_file(&m.document.file.id).await?.path;
-			let file_url = format!(
-				"https://api.telegram.org/file/bot{}/{file_path}",
-				bot.token()
-			);
+			let file_url = format!("https://api.telegram.org/file/bot{}/{file_path}", bot.token());
 			Some((file_url, mime::APPLICATION_OCTET_STREAM))
 		}
 		_ => None,

@@ -1,4 +1,7 @@
-use std::{fs::File, path::Path};
+use std::{
+	fs::File,
+	path::Path,
+};
 
 use anyhow::bail;
 
@@ -7,8 +10,12 @@ use matrix_sdk::{
 	ruma::{
 		events::{
 			room::message::{
-				FileMessageEventContent, ImageMessageEventContent, MessageType, Relation,
-				RoomMessageEventContent, VideoMessageEventContent,
+				FileMessageEventContent,
+				ImageMessageEventContent,
+				MessageType,
+				Relation,
+				RoomMessageEventContent,
+				VideoMessageEventContent,
 			},
 			AnyMessageLikeEventContent,
 		},
@@ -18,15 +25,40 @@ use matrix_sdk::{
 };
 
 use teloxide::{
-	adaptors::{throttle::Limits, Throttle},
-	payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters, SendStickerSetters},
-	prelude::{Requester, RequesterExt},
-	types::{ChatId, InputFile, LinkPreviewOptions, Message, MessageId, ReplyParameters},
-	Bot, RequestError,
+	adaptors::{
+		throttle::Limits,
+		Throttle,
+	},
+	payloads::{
+		SendDocumentSetters,
+		SendMessageSetters,
+		SendPhotoSetters,
+		SendStickerSetters,
+	},
+	prelude::{
+		Requester,
+		RequesterExt,
+	},
+	types::{
+		ChatId,
+		InputFile,
+		LinkPreviewOptions,
+		Message,
+		MessageId,
+		ReplyParameters,
+	},
+	Bot,
+	RequestError,
 };
 
 use crate::{
-	bridge_structs::{BmMxData, BmTgData, Bridge, GetMatrixMedia, TgMessageKind},
+	bridge_structs::{
+		BmMxData,
+		BmTgData,
+		Bridge,
+		GetMatrixMedia,
+		TgMessageKind,
+	},
 	db::BridgedMessage,
 };
 
@@ -121,9 +153,10 @@ pub async fn get_to_tg_data<'a>(
 	};
 	let message_type = &from_mx_data.mx_msg_type;
 	let relates_to = match &from_mx_data.mx_event.content {
-		AnyMessageLikeEventContent::RoomMessage(RoomMessageEventContent { relates_to, .. }) => {
-			relates_to
-		}
+		AnyMessageLikeEventContent::RoomMessage(RoomMessageEventContent {
+			relates_to,
+			..
+		}) => relates_to,
 		_ => &None,
 	};
 	let is_reply = { matches!(&relates_to, Some(Relation::Reply { .. })) };
@@ -217,9 +250,7 @@ pub async fn bot_send_request(
 			Some(TgMessageKind::Sticker) => {
 				let sticker =
 					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
-				bot.send_sticker(chat_id, sticker)
-					.reply_parameters(reply_params.clone())
-					.await
+				bot.send_sticker(chat_id, sticker).reply_parameters(reply_params.clone()).await
 			}
 			Some(TgMessageKind::Document) => {
 				let document =
