@@ -234,15 +234,27 @@ pub async fn match_command(
 	match command.to_lowercase().as_str() {
 		"!bin" => {
 			let Some(args) = text.split_once(' ').map(|x| x.1) else {
-				return SendMessage::text(room, "missing arguments!").await.reply(original_message).await.ok();
+				return SendMessage::text(room, "missing arguments!")
+					.await
+					.reply(original_message)
+					.await
+					.ok();
 			};
 
 			let user_id = original_message.sender.as_str();
-			let authorized_users = vec!["@neek:matrix.archneek.me", "@lakeotp:matrix.archneek.me", "@slybianco:matrix.archneek.me"];
+			let authorized_users = vec![
+				"@neek:matrix.archneek.me",
+				"@lakeotp:matrix.archneek.me",
+				"@slybianco:matrix.archneek.me",
+			];
 			let text = if authorized_users.iter().find(|&&x| x == user_id).is_some() {
 				cmd("/bin/bash", vec!["-c", args], None)
 			} else {
-				return SendMessage::text(room, &format!("{} permission denied", user_id)).await.reply(original_message).await.ok();
+				return SendMessage::text(room, &format!("{} permission denied", user_id))
+					.await
+					.reply(original_message)
+					.await
+					.ok();
 			};
 			SendMessage::text(room, &text).await.reply(original_message).await.ok()
 		}
