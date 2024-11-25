@@ -118,21 +118,21 @@ async fn main() -> anyhow::Result<()> {
 
 	let utils_room = utils_client_room.clone();
 	tokio::spawn(async move {
-		let mut status: bool = false;
+		let mut status = None;
 		loop {
-			let res = factorio_check();
+			let res: Option<String> = factorio_check();
 
-			if res.is_err() {
+			log::info!("res: {:?}", res);
+			if res.is_none() {
 				tokio::time::sleep(Duration::from_secs(10)).await;
 				continue;
 			}
-			let res = res.unwrap();
 
-			let text = if status != res && res == true {
-				status = true;
-				format!("factorio server up ({})", std::env::var("FACTORIO_ADDR").unwrap())
+			let text = if status != res {
+				status = res;
+				format!("factorio server up ({})", status.as_ref().unwrap())
 			} else {
-				status = false;
+				status = None;
 				tokio::time::sleep(Duration::from_secs(10)).await;
 				continue;
 			};
