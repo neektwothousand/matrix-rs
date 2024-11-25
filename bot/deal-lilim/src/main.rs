@@ -122,7 +122,6 @@ async fn main() -> anyhow::Result<()> {
 		loop {
 			let res: Option<String> = factorio_check();
 
-			log::info!("res: {:?}", res);
 			if res.is_none() {
 				tokio::time::sleep(Duration::from_secs(10)).await;
 				continue;
