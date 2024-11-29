@@ -122,21 +122,17 @@ async fn main() -> anyhow::Result<()> {
 		loop {
 			let res: Option<String> = factorio_check();
 
-			if res.is_none() {
-				tokio::time::sleep(Duration::from_secs(10)).await;
-				continue;
+			if let Some(res) = res {
+				if status != Some(res.to_string()) {
+					status = Some(res.to_string());
+					let text = format!("factorio server up ({})", res);
+					let msg = RoomMessageEventContent::text_plain(text);
+					let _ = utils_room.send(msg).await;
+				} else {
+					tokio::time::sleep(Duration::from_secs(10)).await;
+					continue;
+				}
 			}
-
-			let text = if status != res {
-				status = res;
-				format!("factorio server up ({})", status.as_ref().unwrap())
-			} else {
-				status = None;
-				tokio::time::sleep(Duration::from_secs(10)).await;
-				continue;
-			};
-			let msg = RoomMessageEventContent::text_plain(text);
-			let _ = utils_room.send(msg).await;
 		}
 	});
 	let bridges = Arc::new(user.bridges);
