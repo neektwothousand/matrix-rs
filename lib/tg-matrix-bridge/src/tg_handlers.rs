@@ -70,14 +70,18 @@ pub async fn tg_to_mx(
 	client: Arc<Client>,
 	bridges: Arc<Vec<Bridge>>,
 ) -> anyhow::Result<()> {
+	//crate::timer::timer!();
 	let user = get_user_name(&msg)?;
 	let bot = <Throttle<Bot> as Clone>::clone(&bot).into_inner();
 	let MessageKind::Common(ref msg_common) = msg.kind else {
 		bail!("");
 	};
 
-	let bridge: &Bridge =
-		bridges.iter().find(|b| b.tg_id == msg.chat.id.0).context("chat isn't bridged")?;
+	let bridge: &Bridge = {
+		//crate::timer::timer!();
+		bridges.iter().find(|b| b.tg_id == msg.chat.id.0).context("chat isn't bridged")?
+	};
+
 	let matrix_room =
 		client.get_room(&RoomId::parse(&bridge.mx_id)?).context("can't get matrix room")?;
 

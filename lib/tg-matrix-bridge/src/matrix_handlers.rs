@@ -68,6 +68,7 @@ async fn get_reply(
 }
 
 pub async fn mx_to_tg(to_tg_data: BmTgData, from_mx_data: BmMxData<'_>) -> anyhow::Result<()> {
+	//crate::timer::timer!();
 	let bot = to_tg_data.bot.clone().context("bot not found")?;
 	let chat_id = to_tg_data.chat_id.context("chat not found")?;
 	let null_id = -1i32;

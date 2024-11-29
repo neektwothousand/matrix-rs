@@ -50,6 +50,7 @@ pub mod bridge_utils;
 pub mod db;
 pub mod matrix_handlers;
 pub mod tg_handlers;
+mod timer;
 
 pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_url: Arc<String>) {
 	let bot = get_tg_bot().await;

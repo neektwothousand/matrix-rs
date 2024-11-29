@@ -39,8 +39,10 @@ pub async fn send(room: Arc<Room>, content: RoomMessageEventContent) -> anyhow::
 		match room.send(content.clone()).await {
 			Ok(response) => return Ok(response),
 			Err(err) => match err {
-				matrix_sdk::Error::Http(_) => continue,
-				_ => bail!("{:?}", err),
+				matrix_sdk::Error::Http(matrix_sdk::HttpError::Reqwest(_)) => continue,
+				_ => {
+					bail!("{:?}", err);
+				}
 			},
 		}
 	}
