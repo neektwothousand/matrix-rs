@@ -116,6 +116,7 @@ async fn main() -> anyhow::Result<()> {
 		}
 	});
 
+	/*
 	let utils_room = utils_client_room.clone();
 	tokio::spawn(async move {
 		let mut status = None;
@@ -135,6 +136,7 @@ async fn main() -> anyhow::Result<()> {
 			}
 		}
 	});
+	*/
 	let bridges = Arc::new(user.bridges);
 	let webhook_url = Arc::new(user.webhook_url);
 
