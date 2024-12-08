@@ -6,6 +6,7 @@ pub struct FunctionTimer<'a> {
 }
 
 impl<'a> FunctionTimer<'a> {
+	#[allow(dead_code)]
 	pub fn new(msg: &'a str) -> Self {
 		FunctionTimer {
 			msg,
@@ -14,6 +15,7 @@ impl<'a> FunctionTimer<'a> {
 	}
 }
 
+#[allow(unused_macros)]
 macro_rules! timer {
 	() => {
 		let msg = format!("{}:{}", std::file!(), std::line!());
