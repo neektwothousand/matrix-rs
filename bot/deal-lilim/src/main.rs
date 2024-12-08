@@ -1,21 +1,19 @@
 use std::{
 	io::Write,
 	sync::Arc,
-	time::Duration,
 };
 
 use anyhow::Context;
 
 use matrix_sdk::{
 	config::SyncSettings,
-	ruma,
 	ruma::{
+		self,
 		events::{
 			room::{
 				member::StrippedRoomMemberEvent,
 				message::{
 					MessageType,
-					RoomMessageEventContent,
 					SyncRoomMessageEvent,
 				},
 			},
@@ -33,8 +31,10 @@ use interactive::commands::{
 	match_command,
 	match_text,
 };
-use tg_matrix_bridge::bridge_structs::Bridge;
-use utils::factorio_check::factorio_check;
+use tg_matrix_bridge::{
+	bridge_structs::Bridge,
+	matrix_handlers::client_event_handler,
+};
 
 #[derive(Deserialize)]
 struct LoginData {
@@ -116,33 +116,15 @@ async fn main() -> anyhow::Result<()> {
 		}
 	});
 
-	/*
-	let utils_room = utils_client_room.clone();
-	tokio::spawn(async move {
-		let mut status = None;
-		loop {
-			let res: Option<String> = factorio_check();
-
-			if let Some(res) = res {
-				if status != Some(res.to_string()) {
-					status = Some(res.to_string());
-					let text = format!("factorio server up ({})", res);
-					let msg = RoomMessageEventContent::text_plain(text);
-					let _ = utils_room.send(msg).await;
-				} else {
-					tokio::time::sleep(Duration::from_secs(10)).await;
-					continue;
-				}
-			}
-		}
-	});
-	*/
 	let bridges = Arc::new(user.bridges);
 	let webhook_url = Arc::new(user.webhook_url);
 
 	let bridge_client_dispatch = bridge_client.clone();
-	tokio::spawn(tg_matrix_bridge::dispatch(bridge_client_dispatch, bridges, webhook_url));
+	tokio::spawn(tg_matrix_bridge::dispatch(bridge_client_dispatch, bridges.clone(), webhook_url));
 	tokio::spawn(async move {
+		bridge_client.add_event_handler(|ev, raw_event, room, client| {
+			client_event_handler(ev, raw_event, room, client, bridges)
+		});
 		loop {
 			let res = bridge_client.sync(SyncSettings::default()).await;
 			if let Err(res) = res {

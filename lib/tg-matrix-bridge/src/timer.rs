@@ -21,9 +21,7 @@ macro_rules! timer {
 	};
 }
 
-pub(crate) use timer;
-
-impl<'a> Drop for FunctionTimer<'a> {
+impl Drop for FunctionTimer<'_> {
 	fn drop(&mut self) {
 		log::debug!("{} {:?}", self.msg, self.start.elapsed());
 	}

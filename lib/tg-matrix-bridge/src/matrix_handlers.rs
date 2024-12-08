@@ -1,11 +1,16 @@
+use std::sync::Arc;
+
 use crate::{
 	bridge_structs::{
 		BmMxData,
 		BmTgData,
+		Bridge,
 	},
 	bridge_utils::{
 		bot_send_request,
 		get_bms,
+		get_tg_bot,
+		get_to_tg_data,
 		update_bridged_messages,
 	},
 };
@@ -13,13 +18,29 @@ use anyhow::{
 	bail,
 	Context,
 };
-use matrix_sdk::ruma::{
-	events::{
-		AnyMessageLikeEventContent,
-		OriginalMessageLikeEvent,
+use matrix_sdk::{
+	event_handler::RawEvent,
+	media::MediaEventContent,
+	ruma::{
+		events::{
+			room::message::{
+				AddMentions,
+				ForwardThread,
+				ImageMessageEventContent,
+				MessageType,
+				RoomMessageEventContent,
+			},
+			AnyMessageLikeEvent,
+			AnyMessageLikeEventContent,
+			AnySyncMessageLikeEvent,
+			AnyTimelineEvent,
+			MessageLikeUnsigned,
+			OriginalMessageLikeEvent,
+		},
+		EventId,
+		OwnedEventId,
 	},
-	EventId,
-	OwnedEventId,
+	Client,
 };
 use serde_json::Value;
 use teloxide::{
@@ -123,4 +144,83 @@ pub async fn mx_to_tg(to_tg_data: BmTgData, from_mx_data: BmMxData<'_>) -> anyho
 		matrix_chat_id,
 	)?;
 	Ok(())
+}
+
+pub async fn client_event_handler(
+	ev: AnySyncMessageLikeEvent,
+	raw: RawEvent,
+	room: matrix_sdk::Room,
+	client: Client,
+	bridges: Arc<Vec<Bridge>>,
+) {
+	if ev.sender().as_str() == client.user_id().unwrap().as_str() {
+		return;
+	}
+	let Some(bridge) = bridges.iter().find(|b| b.mx_id == room.room_id().as_str()) else {
+		return;
+	};
+	let Some(oc) = ev.original_content() else {
+		return;
+	};
+	let original_ev = OriginalMessageLikeEvent {
+		content: oc.clone(),
+		event_id: ev.event_id().into(),
+		origin_server_ts: ev.origin_server_ts(),
+		room_id: room.room_id().into(),
+		sender: ev.sender().into(),
+		unsigned: MessageLikeUnsigned::new(),
+	};
+	let room_message = if let AnyMessageLikeEventContent::Sticker(sticker) = oc {
+		let body = sticker.body.clone();
+		let Some(source) = sticker.source() else {
+			log::error!("sticker source not found");
+			return;
+		};
+		let event_content = ImageMessageEventContent::new(body, source);
+		let image_info = Some(Box::new(sticker.info));
+		let message_type = MessageType::Image(event_content.info(image_info));
+		let room_message = RoomMessageEventContent::new(message_type);
+		let raw_json_value: serde_json::Value = serde_json::from_str(raw.get()).unwrap();
+		let reply_event_id = match raw_json_value["content"].get("m.relates_to") {
+			Some(relates_to) => {
+				if let Some(in_reply_to) = relates_to.get("m.in_reply_to") {
+					in_reply_to.get("event_id")
+				} else {
+					None
+				}
+			}
+			None => None,
+		};
+		if let Some(reply_event_id) = reply_event_id {
+			let event_id = EventId::parse(reply_event_id.as_str().unwrap()).unwrap();
+			let raw_ev = room.event(&event_id).await.unwrap().event;
+			let ev = match raw_ev.deserialize_as::<AnyTimelineEvent>().unwrap() {
+				AnyTimelineEvent::MessageLike(m) => m,
+				_ => return,
+			};
+			let msg_like_event = match ev {
+				AnyMessageLikeEvent::RoomMessage(m) => m,
+				_ => return,
+			};
+			let oc = msg_like_event.as_original().unwrap();
+			room_message.clone().make_reply_to(oc, ForwardThread::No, AddMentions::No);
+		};
+		room_message
+	} else if let AnyMessageLikeEventContent::RoomMessage(room_message) = oc {
+		room_message
+	} else {
+		return;
+	};
+	let from_mx_data = BmMxData {
+		mx_event: &original_ev,
+		room,
+		mx_msg_type: &room_message.msgtype,
+	};
+	let Ok(to_tg_data) = get_to_tg_data(&from_mx_data, get_tg_bot().await, client, bridge).await
+	else {
+		return;
+	};
+	if let Err(e) = mx_to_tg(to_tg_data, from_mx_data).await {
+		log::error!("{e}");
+	}
 }

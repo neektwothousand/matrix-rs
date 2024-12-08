@@ -73,10 +73,10 @@ fn sign_split_vec_str<'a>(
 	vec_str
 }
 
-fn zip_file<'k, T: FileOptionExtension, W: Write + Seek>(
+fn zip_file<T: FileOptionExtension, W: Write + Seek>(
 	zip: &mut zip::ZipWriter<W>,
 	file: &str,
-	options: FileOptions<'k, T>,
+	options: FileOptions<'_, T>,
 ) {
 	let read = match fs::read(file) {
 		Ok(read) => read,
@@ -87,20 +87,20 @@ fn zip_file<'k, T: FileOptionExtension, W: Write + Seek>(
 	zip.write_all(buf).unwrap();
 }
 
-fn zip_rec<'k, T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
+fn zip_rec<T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
 	out_zip_writer: W,
 	path: P,
-	options: FileOptions<'k, T>,
+	options: FileOptions<'_, T>,
 ) -> io::Result<ZipWriter<W>> {
 	let mut zip_writer = zip::ZipWriter::new(out_zip_writer);
 	zip_rec_aux(&mut zip_writer, path, options)?;
 	Ok(zip_writer)
 }
 
-fn zip_rec_aux<'k, T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
+fn zip_rec_aux<T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
 	zip: &mut zip::ZipWriter<W>,
 	path: P,
-	options: FileOptions<'k, T>,
+	options: FileOptions<'_, T>,
 ) -> io::Result<()> {
 	for maybe_dir_entry in fs::read_dir(path)? {
 		let dir_entry = maybe_dir_entry?;
@@ -242,12 +242,12 @@ pub async fn match_command(
 			};
 
 			let user_id = original_message.sender.as_str();
-			let authorized_users = vec![
+			let authorized_users = [
 				"@neek:matrix.archneek.me",
 				"@lakeotp:matrix.archneek.me",
 				"@slybianco:matrix.archneek.me",
 			];
-			let text = if authorized_users.iter().find(|&&x| x == user_id).is_some() {
+			let text = if authorized_users.iter().any(|&x| x == user_id) {
 				cmd("/bin/bash", vec!["-c", args], None)
 			} else {
 				return SendMessage::text(room, &format!("{} permission denied", user_id))
