@@ -33,12 +33,11 @@ pub fn factorio_check() -> Option<String> {
 		socket.send_to(&msg, socket_addr).unwrap();
 		let mut buf = [0; 64];
 		socket.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
-		
-		let status: Option<String>;
-		match socket.recv(&mut buf) {
-			Ok(_) => status = Some(socket_addr.to_string()),
-			Err(_) => status = None,
-		}
+
+		let status: Option<String> = match socket.recv(&mut buf) {
+			Ok(_) => Some(socket_addr.to_string()),
+			Err(_) => None,
+		};
 		if status.is_some() {
 			return status;
 		}
