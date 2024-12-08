@@ -56,8 +56,8 @@ fn find_mx_event_id(tg_reply: &teloxide::types::Message, mx_chat: &str) -> Optio
 
 async fn get_reply(msg: &Message, matrix_room: &Room) -> Option<AnyMessageLikeEvent> {
 	let event_id = find_mx_event_id(msg, matrix_room.room_id().as_str())?;
-	let raw_ev = matrix_room.event(&event_id).await.ok()?.event;
-	let ev = match raw_ev.deserialize_as::<AnyTimelineEvent>().ok()? {
+	let kind = matrix_room.event(&event_id, None).await.ok()?.kind;
+	let ev = match kind.raw().deserialize_as::<AnyTimelineEvent>().ok()? {
 		AnyTimelineEvent::MessageLike(m) => m,
 		_ => return None,
 	};
@@ -123,7 +123,7 @@ pub async fn tg_to_mx(
 		let file_url = &tg_file.as_ref().unwrap().0;
 		let file = reqwest::get(file_url).await?.bytes().await?.to_vec();
 		let mime = &tg_file.as_ref().unwrap().1;
-		Some(client.media().upload(mime, file).await?.content_uri)
+		Some(client.media().upload(mime, file, None).await?.content_uri)
 	} else {
 		None
 	};
@@ -152,8 +152,8 @@ pub async fn tg_to_mx(
 			MediaKind::Text(t) => {
 				let text = format!("{}: {}", user, t.text);
 				if let Some(event_id) = reply_owned_event_id {
-					let event = matrix_room.event(&event_id).await?;
-					let msg = event.event.deserialize_as::<OriginalRoomMessageEvent>()?;
+					let event = matrix_room.event(&event_id, None).await?;
+					let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
 					RoomMessageEventContent::text_plain(text).make_reply_to(
 						&msg,
 						ForwardThread::No,
@@ -173,8 +173,8 @@ pub async fn tg_to_mx(
 						MediaSource::Plain(mxc_uri.unwrap()),
 					);
 					if let Some(event_id) = reply_owned_event_id {
-						let event = matrix_room.event(&event_id).await?;
-						let msg = event.event.deserialize_as::<OriginalRoomMessageEvent>()?;
+						let event = matrix_room.event(&event_id, None).await?;
+						let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
 						RoomMessageEventContent::new(MessageType::Video(event_content))
 							.make_reply_to(&msg, ForwardThread::No, AddMentions::No)
 					} else {
@@ -186,8 +186,8 @@ pub async fn tg_to_mx(
 						MediaSource::Plain(mxc_uri.unwrap()),
 					);
 					if let Some(event_id) = reply_owned_event_id {
-						let event = matrix_room.event(&event_id).await?;
-						let msg = event.event.deserialize_as::<OriginalRoomMessageEvent>()?;
+						let event = matrix_room.event(&event_id, None).await?;
+						let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
 						RoomMessageEventContent::new(MessageType::Image(event_content))
 							.make_reply_to(&msg, ForwardThread::No, AddMentions::No)
 					} else {
@@ -204,8 +204,8 @@ pub async fn tg_to_mx(
 					MediaSource::Plain(mxc_uri.unwrap()),
 				);
 				if let Some(event_id) = reply_owned_event_id {
-					let event = matrix_room.event(&event_id).await?;
-					let msg = event.event.deserialize_as::<OriginalRoomMessageEvent>()?;
+					let event = matrix_room.event(&event_id, None).await?;
+					let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
 					RoomMessageEventContent::new(MessageType::Video(event_content)).make_reply_to(
 						&msg,
 						ForwardThread::No,
@@ -224,8 +224,8 @@ pub async fn tg_to_mx(
 					MediaSource::Plain(mxc_uri.unwrap()),
 				);
 				if let Some(event_id) = reply_owned_event_id {
-					let event = matrix_room.event(&event_id).await?;
-					let msg = event.event.deserialize_as::<OriginalRoomMessageEvent>()?;
+					let event = matrix_room.event(&event_id, None).await?;
+					let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
 					RoomMessageEventContent::new(MessageType::Video(event_content)).make_reply_to(
 						&msg,
 						ForwardThread::No,

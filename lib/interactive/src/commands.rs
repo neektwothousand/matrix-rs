@@ -161,11 +161,11 @@ fn cmd(command: &str, args: Vec<&str>, stdin_str: Option<String>) -> String {
 }
 
 async fn get_original_text(reply_event: &TimelineEvent, room: &Room) -> Option<String> {
-	let unsigned_event = reply_event.event.deserialize_as::<UnsignedRoomRedactionEvent>().ok()?;
+	let unsigned_event = reply_event.kind.raw().deserialize_as::<UnsignedRoomRedactionEvent>().ok()?;
 	let replace = unsigned_event.unsigned.relations.replace;
 	if let Some(replace) = replace {
-		let timeline_event = room.event(&replace.event_id).await.ok()?;
-		let room_message = timeline_event.event.deserialize_as::<RoomMessageEvent>().ok()?;
+		let timeline_event = room.event(&replace.event_id, None).await.ok()?;
+		let room_message = timeline_event.kind.raw().deserialize_as::<RoomMessageEvent>().ok()?;
 		let original_message = room_message.as_original()?;
 		let relation = original_message.content.relates_to.clone()?;
 		let new_content = match relation {
@@ -179,7 +179,7 @@ async fn get_original_text(reply_event: &TimelineEvent, room: &Room) -> Option<S
 			MessageType::Text(text_message) => Some(text_message.body.clone()),
 			_ => None,
 		}
-	} else if let Ok(message) = reply_event.event.deserialize_as::<RoomMessageEvent>() {
+	} else if let Ok(message) = reply_event.kind.raw().deserialize_as::<RoomMessageEvent>() {
 		let original = message.as_original()?;
 		let MessageType::Text(ref text_message) = original.content.msgtype else {
 			return None;
@@ -205,7 +205,7 @@ async fn get_reply_text(
 		}) => in_reply_to.event_id,
 		Some(_) | None => return None,
 	};
-	let Ok(reply_event) = room.event(&reply_id).await else {
+	let Ok(reply_event) = room.event(&reply_id, None).await else {
 		return None;
 	};
 	let reply_text = get_original_text(&reply_event, room).await?;

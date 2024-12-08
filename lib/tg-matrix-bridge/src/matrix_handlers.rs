@@ -62,14 +62,14 @@ async fn get_reply(
 	matrix_event: &OriginalMessageLikeEvent<AnyMessageLikeEventContent>,
 	room: &matrix_sdk::Room,
 ) -> Option<OwnedEventId> {
-	let timeline_event = match room.event(&matrix_event.event_id).await {
+	let timeline_event = match room.event(&matrix_event.event_id, None).await {
 		Ok(timeline_event) => timeline_event,
 		Err(e) => {
 			log::debug!("{:?}", e);
 			return None;
 		}
 	};
-	let raw_json = match serde_json::from_str::<Value>(timeline_event.event.json().get()) {
+	let raw_json = match serde_json::from_str::<Value>(timeline_event.kind.raw().json().get()) {
 		Ok(raw_json) => raw_json,
 		Err(e) => {
 			log::debug!("{:?}", e);
@@ -193,8 +193,8 @@ pub async fn client_event_handler(
 		};
 		if let Some(reply_event_id) = reply_event_id {
 			let event_id = EventId::parse(reply_event_id.as_str().unwrap()).unwrap();
-			let raw_ev = room.event(&event_id).await.unwrap().event;
-			let ev = match raw_ev.deserialize_as::<AnyTimelineEvent>().unwrap() {
+			let kind = room.event(&event_id, None).await.unwrap().kind;
+			let ev = match kind.raw().deserialize_as::<AnyTimelineEvent>().unwrap() {
 				AnyTimelineEvent::MessageLike(m) => m,
 				_ => return,
 			};

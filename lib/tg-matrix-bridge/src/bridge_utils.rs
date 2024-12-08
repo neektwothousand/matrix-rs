@@ -210,7 +210,7 @@ async fn get_event_content_vec(
 	ec: impl MediaEventContent,
 	client: &Client,
 ) -> anyhow::Result<Vec<u8>> {
-	let message = match client.media().get_file(ec, false).await {
+	let message = match client.media().get_file(&ec, false).await {
 		Ok(Some(message)) => message,
 		Ok(None) => bail!("{}:couldn't get content vec", line!()),
 		Err(e) => bail!("{}:couldn't get content vec: {}", line!(), e),

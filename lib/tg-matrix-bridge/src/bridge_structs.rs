@@ -64,7 +64,7 @@ impl GetMatrixMedia for MatrixMedia {
 	) -> anyhow::Result<MatrixMedia> {
 		match media {
 			MessageType::File(m) => {
-				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
+				let Ok(Some(media)) = client.media().get_file(&m, true).await else {
 					bail!("");
 				};
 				let value = serde_json::to_value(&m)?;
@@ -72,19 +72,19 @@ impl GetMatrixMedia for MatrixMedia {
 				Ok((body.to_string(), media, MessageType::File(m)))
 			}
 			MessageType::Image(m) => {
-				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
+				let Ok(Some(media)) = client.media().get_file(&m, true).await else {
 					bail!("");
 				};
 				Ok((m.body.clone(), media, MessageType::Image(m)))
 			}
 			MessageType::Audio(m) => {
-				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
+				let Ok(Some(media)) = client.media().get_file(&m, true).await else {
 					bail!("");
 				};
 				Ok((m.body.clone(), media, MessageType::Audio(m)))
 			}
 			MessageType::Video(m) => {
-				let Ok(Some(media)) = client.media().get_file(m.clone(), true).await else {
+				let Ok(Some(media)) = client.media().get_file(&m, true).await else {
 					bail!("");
 				};
 				Ok((m.body.clone(), media, MessageType::Video(m)))

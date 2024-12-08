@@ -33,7 +33,7 @@ pub struct SendMessage {
 }
 
 async fn upload(room: Room, media: (Mime, Vec<u8>)) -> Result<MediaResponse, HttpError> {
-	room.client().media().upload(&media.0, media.1).await
+	room.client().media().upload(&media.0, media.1, None).await
 }
 
 impl SendMessage {
