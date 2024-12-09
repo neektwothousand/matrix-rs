@@ -36,7 +36,7 @@ pub struct BmTgData {
 	pub chat_id: Option<ChatId>,
 	pub message: Vec<u8>,
 	pub tg_message_kind: Option<TgMessageKind>,
-	pub file_name: Option<String>,
+	pub caption: Option<String>,
 	pub is_preview_disabled: bool,
 }
 

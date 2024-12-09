@@ -185,21 +185,21 @@ pub async fn get_to_tg_data<'a>(
 			} else {
 				TgMessageKind::Photo
 			});
-			tg_data.file_name = Some(i.body.clone());
+			tg_data.caption = Some(i.body.clone());
 		}
 		MessageType::Video(v) => {
 			let ec = VideoMessageEventContent::new(v.body.clone(), v.source.clone());
 			let message = get_event_content_vec(ec, &client).await?;
 			tg_data.message = message;
 			tg_data.tg_message_kind = Some(TgMessageKind::Document);
-			tg_data.file_name = Some(v.body.clone())
+			tg_data.caption = Some(v.body.clone())
 		}
 		MessageType::File(f) => {
 			let ec = FileMessageEventContent::new(f.body.clone(), f.source.clone());
 			let message = get_event_content_vec(ec, &client).await?;
 			tg_data.message = message;
 			tg_data.tg_message_kind = Some(TgMessageKind::Document);
-			tg_data.file_name = Some(f.body.clone())
+			tg_data.caption = Some(f.body.clone())
 		}
 		t => bail!("unsupported type: {:?}", t),
 	}
@@ -226,7 +226,7 @@ pub async fn bot_send_request(
 	link_preview: LinkPreviewOptions,
 	from_user: String,
 ) -> Result<Message, teloxide::RequestError> {
-	let file_name = to_tg_data.file_name.unwrap_or("unknown".to_string());
+	let caption = format!("(from: {from_user})\n{}", to_tg_data.caption.unwrap_or_default());
 	loop {
 		let res = match to_tg_data.tg_message_kind {
 			Some(TgMessageKind::Text) => {
@@ -240,23 +240,20 @@ pub async fn bot_send_request(
 					.await
 			}
 			Some(TgMessageKind::Photo) => {
-				let photo =
-					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
+				let photo = InputFile::memory(to_tg_data.message.clone());
 				bot.send_photo(chat_id, photo)
-					.caption(from_user.clone())
+					.caption(&caption)
 					.reply_parameters(reply_params.clone())
 					.await
 			}
 			Some(TgMessageKind::Sticker) => {
-				let sticker =
-					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
+				let sticker = InputFile::memory(to_tg_data.message.clone());
 				bot.send_sticker(chat_id, sticker).reply_parameters(reply_params.clone()).await
 			}
 			Some(TgMessageKind::Document) => {
-				let document =
-					InputFile::memory(to_tg_data.message.clone()).file_name(file_name.clone());
+				let document = InputFile::memory(to_tg_data.message.clone());
 				bot.send_document(chat_id, document)
-					.caption(from_user.clone())
+					.caption(&caption)
 					.reply_parameters(reply_params.clone())
 					.await
 			}
