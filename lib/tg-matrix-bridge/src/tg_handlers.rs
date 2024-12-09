@@ -8,6 +8,7 @@ use matrix_sdk::ruma::events::{
 	room::{
 		message::{
 			AddMentions,
+			FileMessageEventContent,
 			ForwardThread,
 			ImageMessageEventContent,
 			MessageType,
@@ -194,13 +195,8 @@ pub async fn tg_to_mx(
 				}
 			}
 			MediaKind::Animation(_) | MediaKind::Video(_) => {
-				let text = format!("from {}:", user);
-				let text_plain = RoomMessageEventContent::text_plain(text);
-				matrix_room.send(text_plain).await?;
-				let event_content = VideoMessageEventContent::new(
-					caption,
-					MediaSource::Plain(mxc_uri.unwrap()),
-				);
+				let event_content =
+					VideoMessageEventContent::new(caption, MediaSource::Plain(mxc_uri.unwrap()));
 				if let Some(event_id) = reply_owned_event_id {
 					let event = matrix_room.event(&event_id, None).await?;
 					let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
@@ -214,23 +210,18 @@ pub async fn tg_to_mx(
 				}
 			}
 			MediaKind::Document(_) => {
-				let text = format!("from {}:", user);
-				let text_plain = RoomMessageEventContent::text_plain(text);
-				matrix_room.send(text_plain).await?;
-				let event_content = VideoMessageEventContent::new(
-					caption,
-					MediaSource::Plain(mxc_uri.unwrap()),
-				);
+				let event_content =
+					FileMessageEventContent::new(caption, MediaSource::Plain(mxc_uri.unwrap()));
 				if let Some(event_id) = reply_owned_event_id {
 					let event = matrix_room.event(&event_id, None).await?;
 					let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
-					RoomMessageEventContent::new(MessageType::Video(event_content)).make_reply_to(
+					RoomMessageEventContent::new(MessageType::File(event_content)).make_reply_to(
 						&msg,
 						ForwardThread::No,
 						AddMentions::No,
 					)
 				} else {
-					RoomMessageEventContent::new(MessageType::Video(event_content))
+					RoomMessageEventContent::new(MessageType::File(event_content))
 				}
 			}
 			_ => bail!("unsupported media_kind"),
