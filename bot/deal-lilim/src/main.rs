@@ -120,8 +120,13 @@ async fn main() -> anyhow::Result<()> {
 	let webhook_url = Arc::new(user.webhook_url);
 
 	let bridge_client_dispatch = bridge_client.clone();
-	tokio::spawn(tg_matrix_bridge::dispatch(bridge_client_dispatch, bridges.clone(), webhook_url));
-	tokio::spawn(async move {
+	let bridge_local_set = tokio::task::LocalSet::new();
+	bridge_local_set.spawn_local(tg_matrix_bridge::dispatch(
+		bridge_client_dispatch,
+		bridges.clone(),
+		webhook_url,
+	));
+	bridge_local_set.spawn_local(async move {
 		bridge_client.add_event_handler(|ev, raw_event, room, client| {
 			client_event_handler(ev, raw_event, room, client, bridges)
 		});
