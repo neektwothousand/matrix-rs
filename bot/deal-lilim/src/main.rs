@@ -1,6 +1,7 @@
 use std::{
 	io::Write,
 	sync::Arc,
+	time::Duration,
 };
 
 use anyhow::Context;
@@ -51,6 +52,20 @@ struct User {
 	bridges: Vec<Bridge>,
 }
 
+fn sync_result_handler(res: Result<(), matrix_sdk::Error>) {
+	match res {
+		Ok(_) => (),
+		Err(e) => match e {
+			matrix_sdk::Error::Http(matrix_sdk::HttpError::Reqwest(e)) => {
+				if !e.is_timeout() {
+					log::debug!("{:?}", e);
+				}
+			}
+			_ => log::debug!("{:?}", e),
+		},
+	}
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	env_logger::Builder::from_default_env()
@@ -66,6 +81,7 @@ async fn main() -> anyhow::Result<()> {
 			)
 		})
 		.init();
+	let mut join_set = tokio::task::JoinSet::new();
 
 	let user: User = toml::from_str(&std::fs::read_to_string("bot_data.toml")?)?;
 
@@ -97,19 +113,17 @@ async fn main() -> anyhow::Result<()> {
 	let utils_client_room = Arc::new(utils_client.get_room(&room_id).context("room not found")?);
 
 	let utils_room = utils_client_room.clone();
-	tokio::spawn(async move {
+	join_set.spawn(async move {
 		loop {
-			let res = tokio::spawn(utils::anilist::anilist_update(
+			utils::anilist::anilist_update(
 				utils_room.clone(),
 				user.anilist_ids.clone(),
-			))
-			.await;
-			log::error!("{:?}", res);
+			).await;
 		}
 	});
 
 	let utils_room = utils_client_room.clone();
-	tokio::spawn(async move {
+	join_set.spawn(async move {
 		loop {
 			let res = utils::socket_listeners::socket_handler(utils_room.clone()).await;
 			log::error!("{:?}", res);
@@ -120,27 +134,26 @@ async fn main() -> anyhow::Result<()> {
 	let webhook_url = Arc::new(user.webhook_url);
 
 	let bridge_client_dispatch = bridge_client.clone();
-	let bridge_local_set = tokio::task::LocalSet::new();
-	bridge_local_set.spawn_local(tg_matrix_bridge::dispatch(
+	join_set.spawn(tg_matrix_bridge::dispatch(
 		bridge_client_dispatch,
 		bridges.clone(),
 		webhook_url,
 	));
-	bridge_local_set.spawn_local(async move {
+	join_set.spawn(async move {
 		bridge_client.add_event_handler(|ev, raw_event, room, client| {
 			client_event_handler(ev, raw_event, room, client, bridges)
 		});
 		loop {
-			let res = bridge_client.sync(SyncSettings::default()).await;
-			if let Err(res) = res {
-				log::debug!("{:?}", res);
-			}
+			let res = bridge_client
+				.sync(SyncSettings::default().timeout(Duration::from_secs(10)))
+				.await;
+			sync_result_handler(res);
 		}
 	});
 
 	// interactive
-	utils_client.add_event_handler(
-		move |ev: SyncRoomMessageEvent, room: Room, client: Client| async move {
+	join_set.spawn(async move {
+		utils_client.add_event_handler(move |ev: SyncRoomMessageEvent, room: Room, client: Client| async move {
 			if ev.sender().as_str() == client.user_id().unwrap().as_str() {
 				return;
 			}
@@ -152,26 +165,27 @@ async fn main() -> anyhow::Result<()> {
 					let _ = match_text(&room, &text, &original_message).await;
 				};
 			}
-		},
-	);
+		});
 
-	// auto join
-	utils_client.add_event_handler(
-		|ev: StrippedRoomMemberEvent, room: Room, client: Client| async move {
-			if ev.state_key != client.user_id().unwrap() {
-				return;
-			}
-			if let Err(err) = room.join().await {
-				dbg!("{}", err);
-			};
-		},
-	);
+		// auto join
+		utils_client.add_event_handler(
+			|ev: StrippedRoomMemberEvent, room: Room, client: Client| async move {
+				if ev.state_key != client.user_id().unwrap() {
+					return;
+				}
+				if let Err(err) = room.join().await {
+					dbg!("{}", err);
+				};
+			},
+		);
+		loop {
+			let res = utils_client
+				.sync(SyncSettings::default().timeout(Duration::from_secs(10))).await;
+			sync_result_handler(res);
+		}
+	});
 
 	log::info!("bot started");
-	loop {
-		let client_sync = utils_client.sync(SyncSettings::default()).await;
-		if let Err(ref e) = client_sync {
-			log::debug!("{:?}", e);
-		}
-	}
+	join_set.join_all().await;
+	Ok(())
 }
