@@ -1,4 +1,5 @@
 use std::{
+	collections::HashMap,
 	fs,
 	io::{
 		Seek,
@@ -44,11 +45,11 @@ use mime::Mime;
 
 use crate::utils::SendMessage;
 
-fn chars_bytes_usize_sum(vec_str: Vec<&str>) -> Vec<usize> {
+fn chars_bytes_usize_sum(vec_str: &[&str]) -> Vec<usize> {
 	let mut list_n: Vec<usize> = vec![0, 0];
 	let mut n: usize = 0;
 	for x in 0..vec_str.len() {
-		for y in vec_str[x].as_bytes().iter() {
+		for y in vec_str[x].as_bytes() {
 			n += *y as usize;
 		}
 		list_n[x] = n;
@@ -59,10 +60,10 @@ fn chars_bytes_usize_sum(vec_str: Vec<&str>) -> Vec<usize> {
 
 fn sign_split_vec_str<'a>(
 	reply_text: &'a str,
-	signs: Vec<&'a str>,
+	signs: &[&'a str],
 ) -> Option<(Vec<&'a str>, &'a str)> {
 	let mut vec_str: Option<(Vec<&str>, &str)> = None;
-	for sign in signs.iter() {
+	for sign in signs {
 		if reply_text.contains(sign) {
 			if let Some(split) = reply_text.split_once(sign) {
 				vec_str = Some((vec![split.0, split.1], *sign));
@@ -78,9 +79,8 @@ fn zip_file<T: FileOptionExtension, W: Write + Seek>(
 	file: &str,
 	options: FileOptions<'_, T>,
 ) {
-	let read = match fs::read(file) {
-		Ok(read) => read,
-		Err(_) => return,
+	let Ok(read) = fs::read(file) else {
+		return;
 	};
 	zip.start_file(file, options).unwrap();
 	let buf = &read[..];
@@ -90,7 +90,7 @@ fn zip_file<T: FileOptionExtension, W: Write + Seek>(
 fn zip_rec<T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
 	out_zip_writer: W,
 	path: P,
-	options: FileOptions<'_, T>,
+	options: &FileOptions<'_, T>,
 ) -> io::Result<ZipWriter<W>> {
 	let mut zip_writer = zip::ZipWriter::new(out_zip_writer);
 	zip_rec_aux(&mut zip_writer, path, options)?;
@@ -100,7 +100,7 @@ fn zip_rec<T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
 fn zip_rec_aux<T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
 	zip: &mut zip::ZipWriter<W>,
 	path: P,
-	options: FileOptions<'_, T>,
+	options: &FileOptions<'_, T>,
 ) -> io::Result<()> {
 	for maybe_dir_entry in fs::read_dir(path)? {
 		let dir_entry = maybe_dir_entry?;
@@ -108,7 +108,7 @@ fn zip_rec_aux<T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
 		let file_type = dir_entry.file_type()?;
 		if file_type.is_dir() {
 			zip.add_directory_from_path(dir_entry.path(), options.clone())?;
-			zip_rec_aux(zip, dir_entry.path(), options.clone())?;
+			zip_rec_aux(zip, dir_entry.path(), options)?;
 		} else if file_type.is_file() {
 			let mut file = fs::File::open(dir_entry.path())?;
 			zip.start_file_from_path(dir_entry.path(), options.clone()).unwrap();
@@ -123,40 +123,37 @@ fn cmd(command: &str, args: Vec<&str>, stdin_str: Option<String>) -> String {
 		Command,
 		Stdio,
 	};
-	match stdin_str {
-		Some(stdin_str) => {
-			let mut cmd = Command::new(command)
-				.args(args)
-				.stdin(Stdio::piped())
-				.stdout(Stdio::piped())
-				.stderr(Stdio::piped())
-				.spawn()
-				.unwrap();
-			let mut stdin = cmd.stdin.take().unwrap();
-			std::thread::spawn(move || {
-				stdin.write_all(stdin_str.as_bytes()).ok();
-			});
-			let output = cmd.wait_with_output().unwrap();
-			format!(
-				"{}{}",
-				String::from_utf8_lossy(&output.stdout),
-				String::from_utf8_lossy(&output.stderr)
-			)
-		}
-		None => {
-			let cmd = Command::new(command)
-				.args(args)
-				.stdout(Stdio::piped())
-				.stderr(Stdio::piped())
-				.spawn()
-				.unwrap();
-			let output = cmd.wait_with_output().unwrap();
-			format!(
-				"{}{}",
-				String::from_utf8_lossy(&output.stdout),
-				String::from_utf8_lossy(&output.stderr)
-			)
-		}
+	if let Some(stdin_str) = stdin_str {
+		let mut cmd = Command::new(command)
+			.args(args)
+			.stdin(Stdio::piped())
+			.stdout(Stdio::piped())
+			.stderr(Stdio::piped())
+			.spawn()
+			.unwrap();
+		let mut stdin = cmd.stdin.take().unwrap();
+		std::thread::spawn(move || {
+			stdin.write_all(stdin_str.as_bytes()).ok();
+		});
+		let output = cmd.wait_with_output().unwrap();
+		format!(
+			"{}{}",
+			String::from_utf8_lossy(&output.stdout),
+			String::from_utf8_lossy(&output.stderr)
+		)
+	} else {
+		let cmd = Command::new(command)
+			.args(args)
+			.stdout(Stdio::piped())
+			.stderr(Stdio::piped())
+			.spawn()
+			.unwrap();
+		let output = cmd.wait_with_output().unwrap();
+		format!(
+			"{}{}",
+			String::from_utf8_lossy(&output.stdout),
+			String::from_utf8_lossy(&output.stderr)
+		)
 	}
 }
 
@@ -169,12 +166,12 @@ async fn get_original_text(reply_event: &TimelineEvent, room: &Room) -> Option<S
 		let room_message = timeline_event.kind.raw().deserialize_as::<RoomMessageEvent>().ok()?;
 		let original_message = room_message.as_original()?;
 		let relation = original_message.content.relates_to.clone()?;
-		let new_content = match relation {
-			Relation::Replacement(Replacement {
-				new_content,
-				..
-			}) => new_content,
-			_ => return None,
+		let Relation::Replacement(Replacement {
+			new_content,
+			..
+		}) = relation
+		else {
+			return None;
 		};
 		match &new_content.msgtype {
 			MessageType::Text(text_message) => Some(text_message.body.clone()),
@@ -236,7 +233,6 @@ pub async fn match_command(
 		"!bin" => {
 			let Some(args) = text.split_once(' ').map(|x| x.1) else {
 				return SendMessage::text(room, "missing arguments!")
-					.await
 					.reply(original_message)
 					.await
 					.ok();
@@ -251,26 +247,24 @@ pub async fn match_command(
 			let text = if authorized_users.iter().any(|&x| x == user_id) {
 				cmd("/bin/bash", vec!["-c", args], None)
 			} else {
-				return SendMessage::text(room, &format!("{} permission denied", user_id))
-					.await
+				return SendMessage::text(room, &format!("{user_id} permission denied"))
 					.reply(original_message)
 					.await
 					.ok();
 			};
-			SendMessage::text(room, &text).await.reply(original_message).await.ok()
+			SendMessage::text(room, &text).reply(original_message).await.ok()
 		}
 		"!dice" => {
 			let arg = args.next()?;
 			let number = arg.parse::<u64>().ok()?;
-			use std::collections::HashMap;
 			let mut hm = HashMap::new();
 			for x in 1..=number {
 				hm.insert(x.to_string(), x);
 			}
-			let text = hm.keys().next().unwrap();
-			SendMessage::text(room, text).await.reply(original_message).await.ok()
+			let text = hm.into_keys().next().unwrap_or_default();
+			SendMessage::text(room, &text).reply(original_message).await.ok()
 		}
-		"!ping" => SendMessage::text(room, "pong").await.reply(original_message).await.ok(),
+		"!ping" => SendMessage::text(room, "pong").reply(original_message).await.ok(),
 		"!sed" => {
 			let args = match text.split_once(' ') {
 				Some(split) => split.1,
@@ -278,30 +272,37 @@ pub async fn match_command(
 			};
 			let stdin_str = reply_text?;
 			let text = cmd("sed", vec!["--sandbox", args], Some(stdin_str));
-			SendMessage::text(room, &text).await.reply(original_message).await.ok()
+			SendMessage::text(room, &text).reply(original_message).await.ok()
 		}
 		"!zip" | "!source" => {
 			let tmp_id = format!("{}{}", original_message.room_id, original_message.event_id);
-			let zip_name = format!("source{}.zip", tmp_id);
-			let file = fs::OpenOptions::new()
+			let zip_name = format!("source{tmp_id}.zip");
+			let Ok(file) = fs::OpenOptions::new()
 				.write(true)
 				.truncate(true)
 				.create(true)
 				.open(zip_name.clone())
-				.unwrap();
+			else {
+				return None;
+			};
 
 			let options = zip::write::SimpleFileOptions::default()
 				.compression_method(zip::CompressionMethod::Stored);
-			let mut zip_writer = zip_rec(file, "bot/", options).unwrap();
+			let Ok(mut zip_writer) = zip_rec(file, "bot/", &options) else {
+				return None;
+			};
 
 			zip_file(&mut zip_writer, "Cargo.toml", options);
 			zip_file(&mut zip_writer, "LICENSE", options);
-			zip_rec_aux(&mut zip_writer, "lib/", options).unwrap();
+			let _ = zip_rec_aux(&mut zip_writer, "lib/", &options);
+			let _ = zip_writer.finish();
 
-			zip_writer.finish().unwrap();
-
-			let mime = "application/zip".parse::<Mime>().unwrap();
-			let file_content = fs::read(&zip_name).unwrap();
+			let Ok(mime) = "application/zip".parse::<Mime>() else {
+				return None;
+			};
+			let Ok(file_content) = fs::read(&zip_name) else {
+				return None;
+			};
 			SendMessage::file(room.clone(), zip_name, (mime, file_content))
 				.await?
 				.reply(original_message)
@@ -331,8 +332,8 @@ pub async fn match_text(
 			let reply_text = reply_text?;
 
 			let signs = vec![" x ", " * ", " + ", " - ", " / ", "*", "+", "-", "/"];
-			let (vec_str, sign) = sign_split_vec_str(&reply_text, signs)?;
-			let vec_usize = chars_bytes_usize_sum(vec_str);
+			let (vec_str, sign) = sign_split_vec_str(&reply_text, &signs)?;
+			let vec_usize = chars_bytes_usize_sum(&vec_str);
 
 			let result = match sign.trim() {
 				"x" | "*" => (vec_usize[0] * vec_usize[1]).to_string(),
@@ -342,7 +343,7 @@ pub async fn match_text(
 				_ => return None,
 			};
 
-			SendMessage::text(room, &result).await.reply(original_message).await.ok()
+			SendMessage::text(room, &result).reply(original_message).await.ok()
 		}
 		_ => None,
 	}

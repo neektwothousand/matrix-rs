@@ -98,7 +98,7 @@ async fn send_update(room: &Room, user_ids: &Vec<u64>) -> anyhow::Result<()> {
 			&activity.get("progress").context("progress not found")?.as_str().unwrap_or_default();
 		let result = format!("｢{user}｣ {activity_link}\n｢{anime}｣ {status} {progress}");
 		if let Err(e) = room.send(RoomMessageEventContent::text_plain(result)).await {
-			eprintln!("{:?}", e);
+			eprintln!("{e:?}");
 			continue;
 		}
 		let mut file = File::options().write(true).create(true).truncate(true).open(&file_name)?;
@@ -108,7 +108,7 @@ async fn send_update(room: &Room, user_ids: &Vec<u64>) -> anyhow::Result<()> {
 	Ok(())
 }
 
-pub async fn anilist_update(room: Arc<Room>, user_ids: Vec<u64>) {
+pub async fn check(room: Arc<Room>, user_ids: Vec<u64>) {
 	loop {
 		if let Err(e) = send_update(&room, &user_ids).await {
 			log::error!("{:?}", e);

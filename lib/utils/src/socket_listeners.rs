@@ -28,7 +28,7 @@ async fn delayed_redaction(room: &Room, res: send_message_event::v3::Response) {
 	sleep(Duration::from_secs(86400)).await;
 	let res = room.redact(&event_id, None, None).await;
 	if let Err(res) = res {
-		eprintln!("redact:\n{:#?}", res);
+		eprintln!("redact:\n{res:#?}");
 	}
 }
 
@@ -55,7 +55,7 @@ async fn read_sock(room: Arc<Room>, socket: &str) -> anyhow::Result<()> {
 		let sock_message = match stream {
 			Ok(stream) => read_to_end_unix_stream(stream),
 			Err(err) => {
-				eprintln!("{:?}", err);
+				eprintln!("{err:?}");
 				continue;
 			}
 		};
@@ -69,16 +69,19 @@ async fn read_sock(room: Arc<Room>, socket: &str) -> anyhow::Result<()> {
 pub async fn socket_handler(room: Arc<Room>) {
 	let sockets = [DIS_SOCK, MUR_SOCK];
 
-	let mut thread_handles = vec![];
+	let mut join_set = tokio::task::JoinSet::new();
 	for socket in sockets {
 		if Path::new(socket).exists() {
-			fs::remove_file(socket).unwrap();
+			match fs::remove_file(socket) {
+				Ok(()) => (),
+				Err(e) => {
+					log::error!("{}", e);
+					return;
+				}
+			};
 		}
 		let room = room.clone();
-		thread_handles.push(read_sock(room, socket));
+		join_set.spawn(read_sock(room, socket));
 	}
-	let s1 = thread_handles.pop().unwrap().await;
-	log::error!("{:?}", s1);
-	let s2 = thread_handles.pop().unwrap().await;
-	log::error!("{:?}", s2);
+	join_set.join_all().await;
 }

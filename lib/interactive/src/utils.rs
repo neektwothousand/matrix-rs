@@ -37,7 +37,7 @@ async fn upload(room: Room, media: (Mime, Vec<u8>)) -> Result<MediaResponse, Htt
 }
 
 impl SendMessage {
-	pub async fn text(room: &Room, text: &str) -> Self {
+	pub fn text(room: &Room, text: &str) -> Self {
 		let message =
 			RoomMessageEventContent::new(MessageType::Text(TextMessageEventContent::plain(text)));
 		Self {
@@ -49,7 +49,7 @@ impl SendMessage {
 		let mxc_uri = match upload(room.clone(), media).await {
 			Ok(response) => response.content_uri,
 			Err(err) => {
-				eprintln!("{:?}", err);
+				eprintln!("{err:?}");
 				return None;
 			}
 		};
@@ -64,7 +64,7 @@ impl SendMessage {
 		let mxc_uri = match upload(room.clone(), media).await {
 			Ok(response) => response.content_uri,
 			Err(err) => {
-				eprintln!("{:?}", err);
+				eprintln!("{err:?}");
 				return None;
 			}
 		};

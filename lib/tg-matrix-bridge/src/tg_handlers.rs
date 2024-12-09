@@ -58,9 +58,9 @@ fn find_mx_event_id(tg_reply: &teloxide::types::Message, mx_chat: &str) -> Optio
 async fn get_reply(msg: &Message, matrix_room: &Room) -> Option<AnyMessageLikeEvent> {
 	let event_id = find_mx_event_id(msg, matrix_room.room_id().as_str())?;
 	let kind = matrix_room.event(&event_id, None).await.ok()?.kind;
-	let ev = match kind.raw().deserialize_as::<AnyTimelineEvent>().ok()? {
-		AnyTimelineEvent::MessageLike(m) => m,
-		_ => return None,
+	let AnyTimelineEvent::MessageLike(ev) = kind.raw().deserialize_as::<AnyTimelineEvent>().ok()?
+	else {
+		return None;
 	};
 	Some(ev)
 }
@@ -88,7 +88,8 @@ pub async fn tg_to_mx(
 
 	let tg_file: Option<(String, mime::Mime)> = match msg_common.media_kind {
 		MediaKind::Photo(ref m) => {
-			let file_path = bot.get_file(&m.photo.last().unwrap().file.id).await?.path;
+			let Some(photo) = &m.photo.last() else { bail!("") };
+			let file_path = bot.get_file(&photo.file.id).await?.path;
 			let file_url = format!("https://api.telegram.org/file/bot{}/{file_path}", bot.token());
 			Some((file_url, mime::IMAGE_JPEG))
 		}
@@ -120,10 +121,10 @@ pub async fn tg_to_mx(
 		_ => None,
 	};
 
-	let mxc_uri = if tg_file.is_some() {
-		let file_url = &tg_file.as_ref().unwrap().0;
+	let mxc_uri = if let Some(ref tg_file) = tg_file {
+		let file_url = &tg_file.0;
+		let mime = &tg_file.1;
 		let file = reqwest::get(file_url).await?.bytes().await?.to_vec();
-		let mime = &tg_file.as_ref().unwrap().1;
 		Some(client.media().upload(mime, file, None).await?.content_uri)
 	} else {
 		None
@@ -166,10 +167,12 @@ pub async fn tg_to_mx(
 				}
 			}
 			MediaKind::Photo(_) | MediaKind::Sticker(_) => {
-				if tg_file.unwrap().1.type_() == "video" {
+				let Some(tg_file) = tg_file else { bail!("") };
+				let Some(mxc_uri) = mxc_uri else { bail!("") };
+				if tg_file.1.type_() == "video" {
 					let event_content = VideoMessageEventContent::new(
 						caption,
-						MediaSource::Plain(mxc_uri.unwrap()),
+						MediaSource::Plain(mxc_uri),
 					);
 					if let Some(event_id) = reply_owned_event_id {
 						let event = matrix_room.event(&event_id, None).await?;
@@ -182,7 +185,7 @@ pub async fn tg_to_mx(
 				} else {
 					let event_content = ImageMessageEventContent::new(
 						caption,
-						MediaSource::Plain(mxc_uri.unwrap()),
+						MediaSource::Plain(mxc_uri),
 					);
 					if let Some(event_id) = reply_owned_event_id {
 						let event = matrix_room.event(&event_id, None).await?;
@@ -195,8 +198,9 @@ pub async fn tg_to_mx(
 				}
 			}
 			MediaKind::Animation(_) | MediaKind::Video(_) => {
+				let Some(mxc_uri) = mxc_uri else { bail!("") };
 				let event_content =
-					VideoMessageEventContent::new(caption, MediaSource::Plain(mxc_uri.unwrap()));
+					VideoMessageEventContent::new(caption, MediaSource::Plain(mxc_uri));
 				if let Some(event_id) = reply_owned_event_id {
 					let event = matrix_room.event(&event_id, None).await?;
 					let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
@@ -210,8 +214,9 @@ pub async fn tg_to_mx(
 				}
 			}
 			MediaKind::Document(_) => {
+				let Some(mxc_uri) = mxc_uri else { bail!("") };
 				let event_content =
-					FileMessageEventContent::new(caption, MediaSource::Plain(mxc_uri.unwrap()));
+					FileMessageEventContent::new(caption, MediaSource::Plain(mxc_uri));
 				if let Some(event_id) = reply_owned_event_id {
 					let event = matrix_room.event(&event_id, None).await?;
 					let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;

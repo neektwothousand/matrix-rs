@@ -52,9 +52,9 @@ use teloxide::{
 	ApiError,
 };
 
-fn find_tg_msg_id(reply: OwnedEventId, mx_chat: &str) -> Option<MessageId> {
+fn find_tg_msg_id(reply: &OwnedEventId, mx_chat: &str) -> Option<MessageId> {
 	let bms = get_bms(mx_chat)?;
-	let bm = bms.iter().find(|bm| bm.matrix_id == reply)?;
+	let bm = bms.iter().find(|bm| bm.matrix_id == *reply)?;
 	Some(bm.telegram_id.1)
 }
 
@@ -97,7 +97,7 @@ pub async fn mx_to_tg(to_tg_data: BmTgData, from_mx_data: BmMxData<'_>) -> anyho
 	let matrix_event = from_mx_data.mx_event;
 	let reply_to_id = {
 		if let Some(matrix_reply) = get_reply(matrix_event, &from_mx_data.room).await {
-			find_tg_msg_id(matrix_reply, matrix_chat_id).unwrap_or(MessageId(null_id))
+			find_tg_msg_id(&matrix_reply, matrix_chat_id).unwrap_or(MessageId(null_id))
 		} else {
 			MessageId(null_id)
 		}
@@ -153,7 +153,10 @@ pub async fn client_event_handler(
 	client: Client,
 	bridges: Arc<Vec<Bridge>>,
 ) {
-	if ev.sender().as_str() == client.user_id().unwrap().as_str() {
+	let Some(client_id) = client.user_id() else {
+		return;
+	};
+	if ev.sender().as_str() == client_id.as_str() {
 		return;
 	}
 	let Some(bridge) = bridges.iter().find(|b| b.mx_id == room.room_id().as_str()) else {
@@ -180,7 +183,9 @@ pub async fn client_event_handler(
 		let image_info = Some(Box::new(sticker.info));
 		let message_type = MessageType::Image(event_content.info(image_info));
 		let room_message = RoomMessageEventContent::new(message_type);
-		let raw_json_value: serde_json::Value = serde_json::from_str(raw.get()).unwrap();
+		let Ok(raw_json_value) = serde_json::from_str::<serde_json::Value>(raw.get()) else {
+			return;
+		};
 		let reply_event_id = match raw_json_value["content"].get("m.relates_to") {
 			Some(relates_to) => {
 				if let Some(in_reply_to) = relates_to.get("m.in_reply_to") {
@@ -192,17 +197,23 @@ pub async fn client_event_handler(
 			None => None,
 		};
 		if let Some(reply_event_id) = reply_event_id {
-			let event_id = EventId::parse(reply_event_id.as_str().unwrap()).unwrap();
-			let kind = room.event(&event_id, None).await.unwrap().kind;
-			let ev = match kind.raw().deserialize_as::<AnyTimelineEvent>().unwrap() {
-				AnyTimelineEvent::MessageLike(m) => m,
-				_ => return,
+			let Ok(event_id) = EventId::parse(reply_event_id.as_str().unwrap_or_default()) else {
+				return;
 			};
-			let msg_like_event = match ev {
-				AnyMessageLikeEvent::RoomMessage(m) => m,
-				_ => return,
+			let Ok(event) = room.event(&event_id, None).await else {
+				return;
 			};
-			let oc = msg_like_event.as_original().unwrap();
+			let Ok(AnyTimelineEvent::MessageLike(ev)) =
+				event.kind.raw().deserialize_as::<AnyTimelineEvent>()
+			else {
+				return;
+			};
+			let AnyMessageLikeEvent::RoomMessage(msg_like_event) = ev else {
+				return;
+			};
+			let Some(oc) = msg_like_event.as_original() else {
+				return;
+			};
 			room_message.clone().make_reply_to(oc, ForwardThread::No, AddMentions::No);
 		};
 		room_message

@@ -74,6 +74,7 @@ pub async fn get_matrix_media(
 	Ok(media)
 }
 
+#[allow(clippy::missing_panics_doc)]
 pub async fn get_tg_bot() -> Throttle<teloxide::Bot> {
 	let token = std::fs::read_to_string("tg_token").unwrap();
 	Bot::new(token).throttle(Limits::default())
@@ -82,7 +83,7 @@ pub async fn get_tg_bot() -> Throttle<teloxide::Bot> {
 pub fn get_user_name(msg: &Message) -> anyhow::Result<String> {
 	let name = if let Some(chat) = &msg.sender_chat {
 		if chat.is_channel() {
-			chat.title().unwrap().to_string()
+			chat.title().unwrap_or_default().to_string()
 		} else {
 			bail!("chat isn't a channel, name not found")
 		}
@@ -99,7 +100,7 @@ pub fn update_bridged_messages(
 	telegram_event_id: (ChatId, MessageId),
 	matrix_chat_id: &str,
 ) -> anyhow::Result<()> {
-	let bm_file_path = format!("bridged_messages/{}.mpk", matrix_chat_id);
+	let bm_file_path = format!("bridged_messages/{matrix_chat_id}.mpk");
 	if !Path::new(&bm_file_path).exists() {
 		File::create_new(&bm_file_path)?;
 	}
@@ -122,8 +123,9 @@ pub fn update_bridged_messages(
 	Ok(())
 }
 
+#[must_use]
 pub fn get_bms(mx_chat: &str) -> Option<Vec<BridgedMessage>> {
-	let bm_file_path = format!("bridged_messages/{}.mpk", mx_chat);
+	let bm_file_path = format!("bridged_messages/{mx_chat}.mpk");
 	let file = match File::open(bm_file_path) {
 		Ok(f) => f,
 		Err(e) => {
@@ -164,7 +166,10 @@ pub async fn get_to_tg_data<'a>(
 		MessageType::Text(t) => {
 			tg_data.message = {
 				if is_reply {
-					t.body.split_once("\n\n").unwrap().1.as_bytes().to_vec()
+					match t.body.split_once("\n\n") {
+						Some(split) => split.1.as_bytes().to_vec(),
+						None => bail!("couldn't find newline split"),
+					}
 				} else {
 					t.body.as_bytes().to_vec()
 				}
@@ -192,14 +197,14 @@ pub async fn get_to_tg_data<'a>(
 			let message = get_event_content_vec(ec, &client).await?;
 			tg_data.message = message;
 			tg_data.tg_message_kind = Some(TgMessageKind::Document);
-			tg_data.caption = Some(v.body.clone())
+			tg_data.caption = Some(v.body.clone());
 		}
 		MessageType::File(f) => {
 			let ec = FileMessageEventContent::new(f.body.clone(), f.source.clone());
 			let message = get_event_content_vec(ec, &client).await?;
 			tg_data.message = message;
 			tg_data.tg_message_kind = Some(TgMessageKind::Document);
-			tg_data.caption = Some(f.body.clone())
+			tg_data.caption = Some(f.body.clone());
 		}
 		t => bail!("unsupported type: {:?}", t),
 	}

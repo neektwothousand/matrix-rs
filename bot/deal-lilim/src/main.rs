@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+
 use std::{
 	io::Write,
 	sync::Arc,
@@ -54,15 +56,16 @@ struct User {
 
 fn sync_result_handler(res: Result<(), matrix_sdk::Error>) {
 	match res {
-		Ok(_) => (),
-		Err(e) => match e {
-			matrix_sdk::Error::Http(matrix_sdk::HttpError::Reqwest(e)) => {
+		Ok(()) => (),
+		Err(e) => {
+			if let matrix_sdk::Error::Http(matrix_sdk::HttpError::Reqwest(e)) = e {
 				if !e.is_timeout() {
 					log::debug!("{:?}", e);
 				}
+			} else {
+				log::debug!("{:?}", e);
 			}
-			_ => log::debug!("{:?}", e),
-		},
+		}
 	}
 }
 
@@ -115,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
 	let utils_room = utils_client_room.clone();
 	join_set.spawn(async move {
 		loop {
-			utils::anilist::anilist_update(utils_room.clone(), user.anilist_ids.clone()).await;
+			utils::anilist::check(utils_room.clone(), user.anilist_ids.clone()).await;
 		}
 	});
 

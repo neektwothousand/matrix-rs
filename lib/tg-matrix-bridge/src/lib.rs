@@ -1,3 +1,4 @@
+#![allow(clippy::missing_errors_doc)]
 use crate::bridge_utils::get_tg_bot;
 use std::sync::Arc;
 
@@ -22,6 +23,7 @@ pub mod matrix_handlers;
 pub mod tg_handlers;
 mod timer;
 
+#[allow(clippy::missing_panics_doc)]
 pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_url: Arc<String>) {
 	let bot = get_tg_bot().await;
 	let url =
@@ -32,9 +34,9 @@ pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_ur
 	let tg_update_handler =
 		teloxide::types::Update::filter_message().branch(teloxide::dptree::endpoint(tg_to_mx));
 	let err_handler = teloxide::error_handlers::LoggingErrorHandler::new();
-	Dispatcher::builder(bot, tg_update_handler)
+	Box::pin(Dispatcher::builder(bot, tg_update_handler)
 		.dependencies(teloxide::dptree::deps![client, bridges])
 		.build()
-		.dispatch_with_listener(listener, err_handler)
+		.dispatch_with_listener(listener, err_handler))
 		.await;
 }
