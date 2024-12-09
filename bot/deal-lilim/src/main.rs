@@ -115,10 +115,7 @@ async fn main() -> anyhow::Result<()> {
 	let utils_room = utils_client_room.clone();
 	join_set.spawn(async move {
 		loop {
-			utils::anilist::anilist_update(
-				utils_room.clone(),
-				user.anilist_ids.clone(),
-			).await;
+			utils::anilist::anilist_update(utils_room.clone(), user.anilist_ids.clone()).await;
 		}
 	});
 
@@ -144,28 +141,29 @@ async fn main() -> anyhow::Result<()> {
 			client_event_handler(ev, raw_event, room, client, bridges)
 		});
 		loop {
-			let res = bridge_client
-				.sync(SyncSettings::default().timeout(Duration::from_secs(10)))
-				.await;
+			let res =
+				bridge_client.sync(SyncSettings::default().timeout(Duration::from_secs(10))).await;
 			sync_result_handler(res);
 		}
 	});
 
 	// interactive
 	join_set.spawn(async move {
-		utils_client.add_event_handler(move |ev: SyncRoomMessageEvent, room: Room, client: Client| async move {
-			if ev.sender().as_str() == client.user_id().unwrap().as_str() {
-				return;
-			}
-			if let SyncMessageLikeEvent::Original(original_message) = ev {
-				if let (MessageType::Text(text), room) =
-					(original_message.content.msgtype.clone(), room.clone())
-				{
-					let _ = match_command(&room, &text, &original_message).await;
-					let _ = match_text(&room, &text, &original_message).await;
-				};
-			}
-		});
+		utils_client.add_event_handler(
+			move |ev: SyncRoomMessageEvent, room: Room, client: Client| async move {
+				if ev.sender().as_str() == client.user_id().unwrap().as_str() {
+					return;
+				}
+				if let SyncMessageLikeEvent::Original(original_message) = ev {
+					if let (MessageType::Text(text), room) =
+						(original_message.content.msgtype.clone(), room.clone())
+					{
+						let _ = match_command(&room, &text, &original_message).await;
+						let _ = match_text(&room, &text, &original_message).await;
+					};
+				}
+			},
+		);
 
 		// auto join
 		utils_client.add_event_handler(
@@ -179,8 +177,8 @@ async fn main() -> anyhow::Result<()> {
 			},
 		);
 		loop {
-			let res = utils_client
-				.sync(SyncSettings::default().timeout(Duration::from_secs(10))).await;
+			let res =
+				utils_client.sync(SyncSettings::default().timeout(Duration::from_secs(10))).await;
 			sync_result_handler(res);
 		}
 	});
