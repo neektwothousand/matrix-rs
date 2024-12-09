@@ -169,7 +169,7 @@ pub async fn tg_to_mx(
 				matrix_room.send(text_plain).await?;
 				if tg_file.unwrap().1.type_() == "video" {
 					let event_content = VideoMessageEventContent::new(
-						"tg_video".to_string(),
+						msg.caption().unwrap_or("").to_string(),
 						MediaSource::Plain(mxc_uri.unwrap()),
 					);
 					if let Some(event_id) = reply_owned_event_id {
@@ -182,7 +182,7 @@ pub async fn tg_to_mx(
 					}
 				} else {
 					let event_content = ImageMessageEventContent::new(
-						"tg_image".to_string(),
+						msg.caption().unwrap_or("").to_string(),
 						MediaSource::Plain(mxc_uri.unwrap()),
 					);
 					if let Some(event_id) = reply_owned_event_id {
@@ -200,7 +200,7 @@ pub async fn tg_to_mx(
 				let text_plain = RoomMessageEventContent::text_plain(text);
 				matrix_room.send(text_plain).await?;
 				let event_content = VideoMessageEventContent::new(
-					"tg_video".to_string(),
+					msg.caption().unwrap_or("").to_string(),
 					MediaSource::Plain(mxc_uri.unwrap()),
 				);
 				if let Some(event_id) = reply_owned_event_id {
@@ -220,7 +220,7 @@ pub async fn tg_to_mx(
 				let text_plain = RoomMessageEventContent::text_plain(text);
 				matrix_room.send(text_plain).await?;
 				let event_content = VideoMessageEventContent::new(
-					"tg_document".to_string(),
+					msg.caption().unwrap_or("").to_string(),
 					MediaSource::Plain(mxc_uri.unwrap()),
 				);
 				if let Some(event_id) = reply_owned_event_id {
@@ -243,16 +243,6 @@ pub async fn tg_to_mx(
 		(msg.chat.id, msg.id),
 		matrix_room.room_id().as_str(),
 	)?;
-
-	if let Some(caption) = msg.caption() {
-		let message = RoomMessageEventContent::text_plain(caption);
-		let sent_mx_msg = utils::matrix::send(matrix_room.clone().into(), message).await?;
-		update_bridged_messages(
-			sent_mx_msg.event_id,
-			(msg.chat.id, msg.id),
-			matrix_room.room_id().as_str(),
-		)?;
-	}
 
 	Ok(())
 }
