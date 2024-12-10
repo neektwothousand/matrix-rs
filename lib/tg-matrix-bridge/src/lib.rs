@@ -23,7 +23,20 @@ pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_ur
 	let url =
 		url::Url::parse(&format!("{webhook_url}{}", bot.clone().into_inner().token())).unwrap();
 	let addr = ([0, 0, 0, 0], 8443).into();
-	let listener = webhooks::axum(bot.clone(), webhooks::Options::new(addr, url)).await.unwrap();
+	let listener = loop {
+		match webhooks::axum(bot.clone(), webhooks::Options::new(addr, url.clone())).await {
+			Ok(listener) => break listener,
+			Err(teloxide::RequestError::Network(e)) => {
+				if e.is_timeout() {
+					continue;
+				}
+			}
+			Err(e) => {
+				log::error!("{e}");
+				return;
+			}
+		}
+	};
 
 	let tg_update_handler =
 		teloxide::types::Update::filter_message().branch(teloxide::dptree::endpoint(tg_to_mx));
