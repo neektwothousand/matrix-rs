@@ -82,7 +82,7 @@ pub async fn mx_to_tg(to_tg_data: BmTgData, from_mx_data: BmMxData<'_>) -> anyho
 			MessageId(null_id)
 		}
 	};
-	let from_user = from_mx_data.mx_event.sender.localpart();
+	let from_user = from_mx_data.mx_event.sender.as_str();
 	let link_preview = LinkPreviewOptions {
 		is_disabled: to_tg_data.is_preview_disabled,
 		url: None,
