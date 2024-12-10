@@ -1,22 +1,14 @@
-use std::{
-	fs,
-	io::Read,
-	os::unix::net::{
-		UnixListener,
-		UnixStream,
-	},
-	path::Path,
-	sync::Arc,
-	time::Duration,
-};
+use std::fs;
+use std::io::Read;
+use std::os::unix::net::UnixListener;
+use std::os::unix::net::UnixStream;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 
-use matrix_sdk::{
-	ruma::{
-		api::client::message::send_message_event,
-		events::room::message::RoomMessageEventContent,
-	},
-	Room,
-};
+use matrix_sdk::ruma::api::client::message::send_message_event;
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::Room;
 
 use tokio::time::sleep;
 

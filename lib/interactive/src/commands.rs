@@ -1,44 +1,30 @@
-use std::{
-	collections::HashMap,
-	fs,
-	io::{
-		Seek,
-		Write,
-		{
-			self,
-		},
-	},
-	path::Path,
+use std::collections::HashMap;
+use std::fs;
+use std::io::Seek;
+use std::io::Write;
+use std::io::{
+	self,
 };
+use std::path::Path;
+use zip::write::FileOptionExtension;
+use zip::write::FileOptions;
+use zip::ZipWriter;
 use zip::{
 	self,
-	write::{
-		FileOptionExtension,
-		FileOptions,
-	},
-	ZipWriter,
 };
 
-use matrix_sdk::{
-	deserialized_responses::TimelineEvent,
-	room::Room,
-	ruma::{
-		api::client::message::send_message_event::v3::Response,
-		events::{
-			relation::Replacement,
-			room::message::{
-				MessageType,
-				Relation,
-				RoomMessageEvent,
-				RoomMessageEventContent,
-				TextMessageEventContent,
-			},
-			OriginalSyncMessageLikeEvent,
-			UnsignedRoomRedactionEvent,
-		},
-		OwnedRoomId,
-	},
-};
+use matrix_sdk::deserialized_responses::TimelineEvent;
+use matrix_sdk::room::Room;
+use matrix_sdk::ruma::api::client::message::send_message_event::v3::Response;
+use matrix_sdk::ruma::events::relation::Replacement;
+use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::room::message::Relation;
+use matrix_sdk::ruma::events::room::message::RoomMessageEvent;
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::ruma::events::room::message::TextMessageEventContent;
+use matrix_sdk::ruma::events::OriginalSyncMessageLikeEvent;
+use matrix_sdk::ruma::events::UnsignedRoomRedactionEvent;
+use matrix_sdk::ruma::OwnedRoomId;
 
 use matrix_sdk::ruma::events::room::message::sanitize::remove_plain_reply_fallback;
 use mime::Mime;
@@ -119,10 +105,8 @@ fn zip_rec_aux<T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
 }
 
 fn cmd(command: &str, args: Vec<&str>, stdin_str: Option<String>) -> String {
-	use std::process::{
-		Command,
-		Stdio,
-	};
+	use std::process::Command;
+	use std::process::Stdio;
 	if let Some(stdin_str) = stdin_str {
 		let mut cmd = Command::new(command)
 			.args(args)

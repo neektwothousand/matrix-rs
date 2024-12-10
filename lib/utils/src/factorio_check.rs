@@ -1,11 +1,7 @@
-use std::{
-	net::{
-		SocketAddr,
-		ToSocketAddrs,
-		UdpSocket,
-	},
-	time::Duration,
-};
+use std::net::SocketAddr;
+use std::net::ToSocketAddrs;
+use std::net::UdpSocket;
+use std::time::Duration;
 
 use serde::Deserialize;
 

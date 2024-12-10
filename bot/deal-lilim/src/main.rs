@@ -1,43 +1,29 @@
 #![allow(clippy::missing_errors_doc)]
 
-use std::{
-	io::Write,
-	sync::Arc,
-	time::Duration,
-};
+use std::io::Write;
+use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Context;
 
-use matrix_sdk::{
-	config::SyncSettings,
-	ruma::{
-		self,
-		events::{
-			room::{
-				member::StrippedRoomMemberEvent,
-				message::{
-					MessageType,
-					SyncRoomMessageEvent,
-				},
-			},
-			SyncMessageLikeEvent,
-		},
-		RoomId,
-	},
-	Client,
-	Room,
+use matrix_sdk::config::SyncSettings;
+use matrix_sdk::ruma::events::room::member::StrippedRoomMemberEvent;
+use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::room::message::SyncRoomMessageEvent;
+use matrix_sdk::ruma::events::SyncMessageLikeEvent;
+use matrix_sdk::ruma::RoomId;
+use matrix_sdk::ruma::{
+	self,
 };
+use matrix_sdk::Client;
+use matrix_sdk::Room;
 
 use serde::Deserialize;
 
-use interactive::commands::{
-	match_command,
-	match_text,
-};
-use tg_matrix_bridge::{
-	bridge_structs::Bridge,
-	matrix_handlers::client_event_handler,
-};
+use interactive::commands::match_command;
+use interactive::commands::match_text;
+use tg_matrix_bridge::bridge_structs::Bridge;
+use tg_matrix_bridge::matrix_handlers::client_event_handler;
 
 #[derive(Deserialize)]
 struct LoginData {

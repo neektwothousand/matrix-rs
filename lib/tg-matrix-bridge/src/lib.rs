@@ -2,19 +2,13 @@
 use crate::bridge_utils::get_tg_bot;
 use std::sync::Arc;
 
-use crate::{
-	bridge_structs::Bridge,
-	tg_handlers::tg_to_mx,
-};
+use crate::bridge_structs::Bridge;
+use crate::tg_handlers::tg_to_mx;
 use matrix_sdk::Client;
 
-use teloxide::{
-	dispatching::{
-		Dispatcher,
-		UpdateFilterExt,
-	},
-	update_listeners::webhooks,
-};
+use teloxide::dispatching::Dispatcher;
+use teloxide::dispatching::UpdateFilterExt;
+use teloxide::update_listeners::webhooks;
 
 pub mod bridge_structs;
 pub mod bridge_utils;
@@ -34,9 +28,11 @@ pub async fn dispatch(client: Arc<Client>, bridges: Arc<Vec<Bridge>>, webhook_ur
 	let tg_update_handler =
 		teloxide::types::Update::filter_message().branch(teloxide::dptree::endpoint(tg_to_mx));
 	let err_handler = teloxide::error_handlers::LoggingErrorHandler::new();
-	Box::pin(Dispatcher::builder(bot, tg_update_handler)
-		.dependencies(teloxide::dptree::deps![client, bridges])
-		.build()
-		.dispatch_with_listener(listener, err_handler))
-		.await;
+	Box::pin(
+		Dispatcher::builder(bot, tg_update_handler)
+			.dependencies(teloxide::dptree::deps![client, bridges])
+			.build()
+			.dispatch_with_listener(listener, err_handler),
+	)
+	.await;
 }

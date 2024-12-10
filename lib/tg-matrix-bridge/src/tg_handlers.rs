@@ -1,53 +1,33 @@
 use std::sync::Arc;
 
-use anyhow::{
-	bail,
-	Context,
-};
-use matrix_sdk::ruma::events::{
-	room::{
-		message::{
-			AddMentions,
-			FileMessageEventContent,
-			ForwardThread,
-			ImageMessageEventContent,
-			MessageType,
-			OriginalRoomMessageEvent,
-			VideoMessageEventContent,
-		},
-		MediaSource,
-	},
-	AnyMessageLikeEvent,
-	AnyTimelineEvent,
-};
-use teloxide::{
-	adaptors::Throttle,
-	prelude::Requester,
-	types::{
-		MediaKind,
-		Message,
-		MessageKind,
-	},
-	Bot,
-};
+use anyhow::bail;
+use anyhow::Context;
+use matrix_sdk::ruma::events::room::message::AddMentions;
+use matrix_sdk::ruma::events::room::message::FileMessageEventContent;
+use matrix_sdk::ruma::events::room::message::ForwardThread;
+use matrix_sdk::ruma::events::room::message::ImageMessageEventContent;
+use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::room::message::OriginalRoomMessageEvent;
+use matrix_sdk::ruma::events::room::message::VideoMessageEventContent;
+use matrix_sdk::ruma::events::room::MediaSource;
+use matrix_sdk::ruma::events::AnyMessageLikeEvent;
+use matrix_sdk::ruma::events::AnyTimelineEvent;
+use teloxide::adaptors::Throttle;
+use teloxide::prelude::Requester;
+use teloxide::types::MediaKind;
+use teloxide::types::Message;
+use teloxide::types::MessageKind;
+use teloxide::Bot;
 
-use crate::{
-	bridge_structs::Bridge,
-	bridge_utils::{
-		get_bms,
-		get_user_name,
-		update_bridged_messages,
-	},
-};
-use matrix_sdk::{
-	ruma::{
-		events::room::message::RoomMessageEventContent,
-		OwnedEventId,
-		RoomId,
-	},
-	Client,
-	Room,
-};
+use crate::bridge_structs::Bridge;
+use crate::bridge_utils::get_bms;
+use crate::bridge_utils::get_user_name;
+use crate::bridge_utils::update_bridged_messages;
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::ruma::OwnedEventId;
+use matrix_sdk::ruma::RoomId;
+use matrix_sdk::Client;
+use matrix_sdk::Room;
 
 fn find_mx_event_id(tg_reply: &teloxide::types::Message, mx_chat: &str) -> Option<OwnedEventId> {
 	let bms = get_bms(mx_chat)?;
@@ -88,7 +68,9 @@ pub async fn tg_to_mx(
 
 	let tg_file: Option<(String, mime::Mime)> = match msg_common.media_kind {
 		MediaKind::Photo(ref m) => {
-			let Some(photo) = &m.photo.last() else { bail!("") };
+			let Some(photo) = &m.photo.last() else {
+				bail!("")
+			};
 			let file_path = bot.get_file(&photo.file.id).await?.path;
 			let file_url = format!("https://api.telegram.org/file/bot{}/{file_path}", bot.token());
 			Some((file_url, mime::IMAGE_JPEG))
@@ -167,13 +149,15 @@ pub async fn tg_to_mx(
 				}
 			}
 			MediaKind::Photo(_) | MediaKind::Sticker(_) => {
-				let Some(tg_file) = tg_file else { bail!("") };
-				let Some(mxc_uri) = mxc_uri else { bail!("") };
+				let Some(tg_file) = tg_file else {
+					bail!("")
+				};
+				let Some(mxc_uri) = mxc_uri else {
+					bail!("")
+				};
 				if tg_file.1.type_() == "video" {
-					let event_content = VideoMessageEventContent::new(
-						caption,
-						MediaSource::Plain(mxc_uri),
-					);
+					let event_content =
+						VideoMessageEventContent::new(caption, MediaSource::Plain(mxc_uri));
 					if let Some(event_id) = reply_owned_event_id {
 						let event = matrix_room.event(&event_id, None).await?;
 						let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
@@ -183,10 +167,8 @@ pub async fn tg_to_mx(
 						RoomMessageEventContent::new(MessageType::Video(event_content))
 					}
 				} else {
-					let event_content = ImageMessageEventContent::new(
-						caption,
-						MediaSource::Plain(mxc_uri),
-					);
+					let event_content =
+						ImageMessageEventContent::new(caption, MediaSource::Plain(mxc_uri));
 					if let Some(event_id) = reply_owned_event_id {
 						let event = matrix_room.event(&event_id, None).await?;
 						let msg = event.kind.raw().deserialize_as::<OriginalRoomMessageEvent>()?;
@@ -198,7 +180,9 @@ pub async fn tg_to_mx(
 				}
 			}
 			MediaKind::Animation(_) | MediaKind::Video(_) => {
-				let Some(mxc_uri) = mxc_uri else { bail!("") };
+				let Some(mxc_uri) = mxc_uri else {
+					bail!("")
+				};
 				let event_content =
 					VideoMessageEventContent::new(caption, MediaSource::Plain(mxc_uri));
 				if let Some(event_id) = reply_owned_event_id {
@@ -214,7 +198,9 @@ pub async fn tg_to_mx(
 				}
 			}
 			MediaKind::Document(_) => {
-				let Some(mxc_uri) = mxc_uri else { bail!("") };
+				let Some(mxc_uri) = mxc_uri else {
+					bail!("")
+				};
 				let event_content =
 					FileMessageEventContent::new(caption, MediaSource::Plain(mxc_uri));
 				if let Some(event_id) = reply_owned_event_id {

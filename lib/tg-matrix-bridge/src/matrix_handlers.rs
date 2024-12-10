@@ -1,56 +1,36 @@
 use std::sync::Arc;
 
-use crate::{
-	bridge_structs::{
-		BmMxData,
-		BmTgData,
-		Bridge,
-	},
-	bridge_utils::{
-		bot_send_request,
-		get_bms,
-		get_tg_bot,
-		get_to_tg_data,
-		update_bridged_messages,
-	},
-};
-use anyhow::{
-	bail,
-	Context,
-};
-use matrix_sdk::{
-	event_handler::RawEvent,
-	media::MediaEventContent,
-	ruma::{
-		events::{
-			room::message::{
-				AddMentions,
-				ForwardThread,
-				ImageMessageEventContent,
-				MessageType,
-				RoomMessageEventContent,
-			},
-			AnyMessageLikeEvent,
-			AnyMessageLikeEventContent,
-			AnySyncMessageLikeEvent,
-			AnyTimelineEvent,
-			MessageLikeUnsigned,
-			OriginalMessageLikeEvent,
-		},
-		EventId,
-		OwnedEventId,
-	},
-	Client,
-};
+use crate::bridge_structs::BmMxData;
+use crate::bridge_structs::BmTgData;
+use crate::bridge_structs::Bridge;
+use crate::bridge_utils::bot_send_request;
+use crate::bridge_utils::get_bms;
+use crate::bridge_utils::get_tg_bot;
+use crate::bridge_utils::get_to_tg_data;
+use crate::bridge_utils::update_bridged_messages;
+use anyhow::bail;
+use anyhow::Context;
+use matrix_sdk::event_handler::RawEvent;
+use matrix_sdk::media::MediaEventContent;
+use matrix_sdk::ruma::events::room::message::AddMentions;
+use matrix_sdk::ruma::events::room::message::ForwardThread;
+use matrix_sdk::ruma::events::room::message::ImageMessageEventContent;
+use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::ruma::events::AnyMessageLikeEvent;
+use matrix_sdk::ruma::events::AnyMessageLikeEventContent;
+use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
+use matrix_sdk::ruma::events::AnyTimelineEvent;
+use matrix_sdk::ruma::events::MessageLikeUnsigned;
+use matrix_sdk::ruma::events::OriginalMessageLikeEvent;
+use matrix_sdk::ruma::EventId;
+use matrix_sdk::ruma::OwnedEventId;
+use matrix_sdk::Client;
 use serde_json::Value;
-use teloxide::{
-	types::{
-		LinkPreviewOptions,
-		MessageId,
-		ReplyParameters,
-	},
-	ApiError,
-};
+use teloxide::types::LinkPreviewOptions;
+use teloxide::types::MessageId;
+use teloxide::types::ReplyParameters;
+use teloxide::ApiError;
 
 fn find_tg_msg_id(reply: &OwnedEventId, mx_chat: &str) -> Option<MessageId> {
 	let bms = get_bms(mx_chat)?;

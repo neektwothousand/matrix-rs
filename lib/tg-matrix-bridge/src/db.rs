@@ -1,12 +1,8 @@
 use matrix_sdk::ruma::OwnedEventId;
-use serde::{
-	Deserialize,
-	Serialize,
-};
-use teloxide::types::{
-	ChatId,
-	MessageId,
-};
+use serde::Deserialize;
+use serde::Serialize;
+use teloxide::types::ChatId;
+use teloxide::types::MessageId;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BridgedMessage {

@@ -1,29 +1,17 @@
-use matrix_sdk::{
-	room::Room,
-	ruma::{
-		api::client::{
-			media::create_content::v3::Response as MediaResponse,
-			message::send_message_event::v3::Response,
-		},
-		events::{
-			room::message::{
-				AddMentions,
-				ForwardThread,
-				RoomMessageEventContent,
-			},
-			OriginalMessageLikeEvent,
-		},
-	},
-	Error,
-	HttpError,
-};
+use matrix_sdk::room::Room;
+use matrix_sdk::ruma::api::client::media::create_content::v3::Response as MediaResponse;
+use matrix_sdk::ruma::api::client::message::send_message_event::v3::Response;
+use matrix_sdk::ruma::events::room::message::AddMentions;
+use matrix_sdk::ruma::events::room::message::ForwardThread;
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::ruma::events::OriginalMessageLikeEvent;
+use matrix_sdk::Error;
+use matrix_sdk::HttpError;
 
-use matrix_sdk::ruma::events::room::message::{
-	FileMessageEventContent,
-	ImageMessageEventContent,
-	MessageType,
-	TextMessageEventContent,
-};
+use matrix_sdk::ruma::events::room::message::FileMessageEventContent;
+use matrix_sdk::ruma::events::room::message::ImageMessageEventContent;
+use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::room::message::TextMessageEventContent;
 
 use mime::Mime;
 

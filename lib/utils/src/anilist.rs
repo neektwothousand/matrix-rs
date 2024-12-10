@@ -1,19 +1,13 @@
-use std::{
-	fs::File,
-	io::{
-		Read,
-		Write,
-	},
-	sync::Arc,
-	time::Duration,
-};
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
+use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::time::sleep;
 
-use matrix_sdk::{
-	ruma::events::room::message::RoomMessageEventContent,
-	Room,
-};
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::Room;
 
 use anyhow::Context;
 

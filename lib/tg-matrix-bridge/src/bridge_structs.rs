@@ -1,20 +1,14 @@
 use std::sync::LazyLock;
 
-use anyhow::{
-	bail,
-	Context,
-};
-use matrix_sdk::ruma::events::{
-	room::message::MessageType,
-	AnyMessageLikeEventContent,
-	OriginalMessageLikeEvent,
-};
+use anyhow::bail;
+use anyhow::Context;
+use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::AnyMessageLikeEventContent;
+use matrix_sdk::ruma::events::OriginalMessageLikeEvent;
 use serde::Deserialize;
-use teloxide::{
-	adaptors::Throttle,
-	types::ChatId,
-	Bot,
-};
+use teloxide::adaptors::Throttle;
+use teloxide::types::ChatId;
+use teloxide::Bot;
 
 #[derive(Clone)]
 pub enum TgMessageKind {

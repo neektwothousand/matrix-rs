@@ -1,66 +1,42 @@
-use std::{
-	fs::File,
-	path::Path,
-};
+use std::fs::File;
+use std::path::Path;
 
 use anyhow::bail;
 
-use matrix_sdk::{
-	media::MediaEventContent,
-	ruma::{
-		events::{
-			room::message::{
-				FileMessageEventContent,
-				ImageMessageEventContent,
-				MessageType,
-				Relation,
-				RoomMessageEventContent,
-				VideoMessageEventContent,
-			},
-			AnyMessageLikeEventContent,
-		},
-		OwnedEventId,
-	},
-	Client,
-};
+use matrix_sdk::media::MediaEventContent;
+use matrix_sdk::ruma::events::room::message::FileMessageEventContent;
+use matrix_sdk::ruma::events::room::message::ImageMessageEventContent;
+use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::room::message::Relation;
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::ruma::events::room::message::VideoMessageEventContent;
+use matrix_sdk::ruma::events::AnyMessageLikeEventContent;
+use matrix_sdk::ruma::OwnedEventId;
+use matrix_sdk::Client;
 
-use teloxide::{
-	adaptors::{
-		throttle::Limits,
-		Throttle,
-	},
-	payloads::{
-		SendDocumentSetters,
-		SendMessageSetters,
-		SendPhotoSetters,
-		SendStickerSetters,
-	},
-	prelude::{
-		Requester,
-		RequesterExt,
-	},
-	types::{
-		ChatId,
-		InputFile,
-		LinkPreviewOptions,
-		Message,
-		MessageId,
-		ReplyParameters,
-	},
-	Bot,
-	RequestError,
-};
+use teloxide::adaptors::throttle::Limits;
+use teloxide::adaptors::Throttle;
+use teloxide::payloads::SendDocumentSetters;
+use teloxide::payloads::SendMessageSetters;
+use teloxide::payloads::SendPhotoSetters;
+use teloxide::payloads::SendStickerSetters;
+use teloxide::prelude::Requester;
+use teloxide::prelude::RequesterExt;
+use teloxide::types::ChatId;
+use teloxide::types::InputFile;
+use teloxide::types::LinkPreviewOptions;
+use teloxide::types::Message;
+use teloxide::types::MessageId;
+use teloxide::types::ReplyParameters;
+use teloxide::Bot;
+use teloxide::RequestError;
 
-use crate::{
-	bridge_structs::{
-		BmMxData,
-		BmTgData,
-		Bridge,
-		GetMatrixMedia,
-		TgMessageKind,
-	},
-	db::BridgedMessage,
-};
+use crate::bridge_structs::BmMxData;
+use crate::bridge_structs::BmTgData;
+use crate::bridge_structs::Bridge;
+use crate::bridge_structs::GetMatrixMedia;
+use crate::bridge_structs::TgMessageKind;
+use crate::db::BridgedMessage;
 
 pub async fn get_matrix_media(
 	client: Client,
