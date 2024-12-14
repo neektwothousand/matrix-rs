@@ -11,3 +11,4 @@ Cross.toml
 cross.sh
 tg_token
 bot_data.toml
+.gitpod.yml
