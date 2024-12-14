@@ -16,6 +16,7 @@ use matrix_sdk::Client;
 
 use teloxide::adaptors::throttle::Limits;
 use teloxide::adaptors::Throttle;
+use teloxide::payloads::SendVideoSetters;
 use teloxide::payloads::SendDocumentSetters;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::payloads::SendPhotoSetters;
@@ -163,7 +164,7 @@ pub async fn get_to_tg_data<'a>(
 			let ec = VideoMessageEventContent::new(v.body.clone(), v.source.clone());
 			let message = get_event_content_vec(ec, &client).await?;
 			tg_data.message = message;
-			tg_data.tg_message_kind = Some(TgMessageKind::Document);
+			tg_data.tg_message_kind = Some(TgMessageKind::Video);
 			tg_data.caption = Some(v.body.clone());
 		}
 		MessageType::File(f) => {
@@ -212,19 +213,26 @@ pub async fn bot_send_request(
 					.await
 			}
 			Some(TgMessageKind::Photo) => {
-				let photo = InputFile::memory(to_tg_data.message.clone());
-				bot.send_photo(chat_id, photo)
+				let input_file = InputFile::memory(to_tg_data.message.clone());
+				bot.send_photo(chat_id, input_file)
 					.caption(&caption)
 					.reply_parameters(reply_params.clone())
 					.await
 			}
 			Some(TgMessageKind::Sticker) => {
-				let sticker = InputFile::memory(to_tg_data.message.clone());
-				bot.send_sticker(chat_id, sticker).reply_parameters(reply_params.clone()).await
+				let input_file = InputFile::memory(to_tg_data.message.clone());
+				bot.send_sticker(chat_id, input_file).reply_parameters(reply_params.clone()).await
+			}
+			Some(TgMessageKind::Video) => {
+				let input_file = InputFile::memory(to_tg_data.message.clone());
+				bot.send_video(chat_id, input_file)
+					.caption(&caption)
+					.reply_parameters(reply_params.clone())
+					.await
 			}
 			Some(TgMessageKind::Document) => {
-				let document = InputFile::memory(to_tg_data.message.clone());
-				bot.send_document(chat_id, document)
+				let input_file = InputFile::memory(to_tg_data.message.clone());
+				bot.send_document(chat_id, input_file)
 					.caption(&caption)
 					.reply_parameters(reply_params.clone())
 					.await

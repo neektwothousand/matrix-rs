@@ -15,6 +15,7 @@ pub enum TgMessageKind {
 	Text,
 	Photo,
 	Sticker,
+	Video,
 	Document,
 }
 
