@@ -16,11 +16,11 @@ use matrix_sdk::Client;
 
 use teloxide::adaptors::throttle::Limits;
 use teloxide::adaptors::Throttle;
-use teloxide::payloads::SendVideoSetters;
 use teloxide::payloads::SendDocumentSetters;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::payloads::SendPhotoSetters;
 use teloxide::payloads::SendStickerSetters;
+use teloxide::payloads::SendVideoSetters;
 use teloxide::prelude::Requester;
 use teloxide::prelude::RequesterExt;
 use teloxide::types::ChatId;

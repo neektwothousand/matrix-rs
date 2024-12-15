@@ -37,7 +37,7 @@ pub async fn send(room: Arc<Room>, content: RoomMessageEventContent) -> anyhow::
 					} else {
 						bail!("{:?}", err);
 					}
-				},
+				}
 				_ => {
 					bail!("{:?}", err);
 				}
