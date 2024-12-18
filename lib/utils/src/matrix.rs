@@ -34,9 +34,8 @@ pub async fn send(room: Arc<Room>, content: RoomMessageEventContent) -> anyhow::
 				matrix_sdk::Error::Http(matrix_sdk::HttpError::Reqwest(err)) => {
 					if err.is_timeout() {
 						continue;
-					} else {
-						bail!("{:?}", err);
 					}
+					bail!("{:?}", err);
 				}
 				_ => {
 					bail!("{:?}", err);
