@@ -1,5 +1,3 @@
-#![allow(clippy::missing_errors_doc)]
-
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
