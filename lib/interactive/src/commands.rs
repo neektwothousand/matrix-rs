@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs;
 use std::io::Seek;
 use std::io::Write;
@@ -6,6 +5,9 @@ use std::io::{
 	self,
 };
 use std::path::Path;
+use std::process::Command;
+use std::process::Stdio;
+
 use zip::write::FileOptionExtension;
 use zip::write::FileOptions;
 use zip::ZipWriter;
@@ -105,8 +107,6 @@ fn zip_rec_aux<T: FileOptionExtension + Clone, W: Write + Seek, P: AsRef<Path>>(
 }
 
 fn cmd(command: &str, args: Vec<&str>, stdin_str: Option<String>) -> String {
-	use std::process::Command;
-	use std::process::Stdio;
 	if let Some(stdin_str) = stdin_str {
 		let mut cmd = Command::new(command)
 			.args(args)
@@ -195,6 +195,39 @@ async fn get_reply_text(
 	Some(reply_text)
 }
 
+fn ddurandom(arg: &str, limit: u64) -> String {
+	let tr_arg = match arg {
+		"digit" => "\"[:digit:]\"",
+		"alnum" => "\"[:alnum:]\"",
+		"alpha" => "\"[:alpha:]\"",
+		"graph" => "\"[:graph:]\"",
+		_ => "\"[:print:]\"",
+	};
+	let bash_args = vec![format!(
+		"dd if=/dev/urandom of=/dev/stdout status=none \\
+			| tr -dc {tr_arg} | head -c {limit}"
+	)];
+	let res = Command::new("/bin/bash")
+		.arg("-c")
+		.args(bash_args)
+		.stdout(Stdio::piped())
+		.stderr(Stdio::piped())
+		.spawn();
+	if let Ok(spawn) = res {
+		if let Ok(output) = spawn.wait_with_output() {
+			format!(
+				"{}\n{}",
+				String::from_utf8_lossy(&output.stdout),
+				String::from_utf8_lossy(&output.stderr),
+			)
+		} else {
+			"error".to_string()
+		}
+	} else {
+		"error".to_string()
+	}
+}
+
 pub async fn match_command(
 	room: &Room,
 	command: &TextMessageEventContent,
@@ -238,15 +271,11 @@ pub async fn match_command(
 			};
 			SendMessage::text(room, &text).reply(original_message).await.ok()
 		}
-		"!dice" => {
-			let arg = args.next()?;
-			let number = arg.parse::<u64>().ok()?;
-			let mut hm = HashMap::new();
-			for x in 1..=number {
-				hm.insert(x.to_string(), x);
-			}
-			let text = hm.into_keys().next().unwrap_or_default();
-			SendMessage::text(room, &text).reply(original_message).await.ok()
+		"!ddurandom" | "!random" | "!rand" => {
+			let arg = args.next().unwrap_or("alnum");
+			let limit = args.next().unwrap_or("20").parse::<u64>().unwrap_or(20);
+			let output = ddurandom(arg, limit);
+			SendMessage::text(room, &output).reply(original_message).await.ok()
 		}
 		"!ping" => SendMessage::text(room, "pong").reply(original_message).await.ok(),
 		"!sed" => {
